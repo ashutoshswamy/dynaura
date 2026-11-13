@@ -1,0 +1,25 @@
+/* Rich card content. Colors come from the toast, so it follows any theme. */
+.fc { display: flex; flex-direction: column; gap: 22px; color: var(--dynaura-fg); font-size: 14px; }
+.fc b { font-weight: 600; }
+.fc-mute { color: var(--dynaura-muted); font-size: 13px; }
+.fc-top, .fc-meta, .fc-line { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.fc-meta { align-items: flex-end; }
+.fc-brand { display: inline-flex; align-items: center; gap: 10px; letter-spacing: 0.22em; font-weight: 800; font-size: 14px; }
+.fc-brand svg { width: 20px; height: 20px; color: var(--dynaura-fg); }
+
+/* boarding pass */
+.fc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.fc-label { display: block; margin-bottom: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--dynaura-muted); }
+.fc-val { display: block; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+.fc-tear { height: 0; border-top: 2px dashed var(--dynaura-btn); border-top-color: color-mix(in srgb, var(--dynaura-fg) 18%, transparent); }
+.fc-barcode { height: 46px; border-radius: 8px; opacity: 0.85; background: repeating-linear-gradient(90deg, var(--dynaura-fg) 0 2px, transparent 2px 5px, var(--dynaura-fg) 5px 6px, transparent 6px 9px, var(--dynaura-fg) 9px 12px, transparent 12px 15px); }
+
+/* ride + delivery + payment */
+.fc-row { display: flex; align-items: center; gap: 14px; }
+.fc-av { flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: var(--state); background: var(--dynaura-btn); background: color-mix(in srgb, var(--state) 20%, transparent); }
+.fc-eta { margin-left: auto; font-weight: 700; font-size: 20px; color: var(--state); }
+.fc-steps { display: flex; gap: 6px; }
+.fc-steps i { flex: 1; height: 5px; border-radius: 9px; background: var(--dynaura-btn); }
+.fc-steps i.on { background: var(--state); }
+.fc-big { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; margin-bottom: 8px; }
+.fc-line span { font-size: 12px; }

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>dynaura Open Graph image</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap">
+<style>
+:root{--paper:#f4f3ef;--ink:#15140f;--muted:#625f55}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{position:relative;width:1200px;height:630px;overflow:hidden;background:var(--paper);color:var(--ink);
+  font-family:"Bricolage Grotesque",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+
+/* text column: everything at least 64px inside the edges */
+.brand{position:absolute;left:64px;top:64px;display:flex;align-items:center;gap:14px;font-weight:700;font-size:28px;letter-spacing:-.03em}
+.brand img{display:block;height:40px;width:auto}
+h1{position:absolute;left:64px;top:198px;margin:0;width:624px;font-size:64px;line-height:1.04;letter-spacing:-.035em;font-weight:700;text-wrap:balance}
+.sub{position:absolute;left:64px;top:356px;margin:0;width:560px;font-size:23px;line-height:1.45;color:var(--muted);text-wrap:pretty}
+.domain{position:absolute;left:64px;bottom:64px;margin:0;font-size:19px;font-weight:500;line-height:1;color:var(--muted)}
+
+/* the stack: three real toasts, placed by the edge of each island (images carry their own soft shadow) */
+.panel{position:absolute;left:704px;top:64px;width:432px;height:502px;border-radius:36px;background:rgba(21,20,15,.05)}
+.t{position:absolute;display:block;max-width:none}
+.card{left:696px;top:74.5px;width:448px}
+.success{left:688.5px;top:389.5px;width:387px}
+.progress{left:803px;top:480.5px;width:332px}
+</style>
+</head>
+<body>
+  <div class="brand"><img src="../assets/logo-mark.png" alt="">dynaura</div>
+  <h1>Toasts that move like a Dynamic Island.</h1>
+  <p class="sub">React, Vue, Svelte and vanilla JS. Zero dependencies.</p>
+  <p class="domain">dynaura.ashutoshswamy.in</p>
+
+  <div class="panel"></div>
+  <img class="t card" src="img/card.png" alt="">
+  <img class="t success" src="img/success.png" alt="">
+  <img class="t progress" src="img/progress.png" alt="">
+</body>
+</html>

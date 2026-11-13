@@ -1,0 +1,133 @@
+{
+  "name": "dynaura",
+  "version": "0.1.0",
+  "description": "Dynamic Island style toasts. Spring-morphing, swipeable, themeable, zero dependencies. React, Vue, Svelte, vanilla.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./styles.css": "./dist/styles.css",
+    "./vanilla": {
+      "import": {
+        "types": "./dist/vanilla.d.ts",
+        "default": "./dist/vanilla.js"
+      },
+      "require": {
+        "types": "./dist/vanilla.d.cts",
+        "default": "./dist/vanilla.cjs"
+      }
+    },
+    "./vue": {
+      "import": {
+        "types": "./dist/vue.d.ts",
+        "default": "./dist/vue.js"
+      },
+      "require": {
+        "types": "./dist/vue.d.cts",
+        "default": "./dist/vue.cjs"
+      }
+    },
+    "./svelte": {
+      "import": {
+        "types": "./dist/svelte.d.ts",
+        "default": "./dist/svelte.js"
+      },
+      "require": {
+        "types": "./dist/svelte.d.cts",
+        "default": "./dist/svelte.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "vite",
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "vue": ">=3"
+  },
+  "devDependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "jsdom": "^25.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0",
+    "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "toast",
+    "notification",
+    "dynamic-island",
+    "react",
+    "vue",
+    "svelte",
+    "animation",
+    "spring"
+  ],
+  "author": {
+    "name": "Ashutosh Swamy",
+    "url": "https://ashutoshswamy.in"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ashutoshswamy/dynaura.git"
+  },
+  "homepage": "https://dynaura.ashutoshswamy.in",
+  "bugs": {
+    "url": "https://github.com/ashutoshswamy/dynaura/issues"
+  },
+  "typesVersions": {
+    "*": {
+      "vanilla": [
+        "./dist/vanilla.d.ts"
+      ],
+      "vue": [
+        "./dist/vue.d.ts"
+      ],
+      "svelte": [
+        "./dist/svelte.d.ts"
+      ]
+    }
+  }
+}
