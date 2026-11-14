@@ -147,7 +147,8 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
 
   // ---- size morph ----
   let raf = 0;
-  const isCard = () => t?.variant === "card";
+  // reads the DOM, not `t`: `t` is null while the exit animation plays, which used to drop the clip-path (sharp box) and snap the row left
+  const isCard = () => island.dataset.variant === "card";
   // card variant: follow the transitioning width/height each frame and redraw the notch outline
   function shape() {
     if (!isCard()) { island.style.clipPath = ""; row.style.transform = ""; return; }
@@ -172,7 +173,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     island.style.width = w + "px";
     island.style.height = hh + "px";
     island.style.borderRadius = isCard() ? "0" : Math.min(hh / 2, 32) + "px";
-    if (isCard()) shapeLoop(); else island.style.clipPath = "";
+    if (isCard()) shapeLoop(); else { cancelAnimationFrame(raf); island.style.clipPath = ""; row.style.transform = ""; }
   }
   function measure() {
     if (island.hidden) return;
@@ -305,7 +306,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     island.dataset.open = "false";
     hideT = setTimeout(() => {
       cancelAnimationFrame(raf); island.style.clipPath = "";
-      island.hidden = true; ready = false; expanded = false;
+      island.hidden = true; ready = false; expanded = false; row.style.transform = "";
       delete island.dataset.ready; island.dataset.expanded = "false";
       island.style.width = island.style.height = island.style.borderRadius = "";
       [badge, trail, desc].forEach((s) => put(s, undefined));
