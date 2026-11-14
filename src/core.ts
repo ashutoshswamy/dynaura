@@ -151,7 +151,8 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
   const isCard = () => island.dataset.variant === "card";
   // card variant: follow the transitioning width/height each frame and redraw the notch outline
   function shape() {
-    if (!isCard()) { island.style.clipPath = ""; row.style.transform = ""; return; }
+    const card = isCard();
+    if (!card && !island.style.clipPath) return; // ponytail: leaving card keeps a pill clip until the loop ends, else the square island flashes while border-radius eases in
     const cs = getComputedStyle(island);
     const w = parseFloat(cs.width), hh = parseFloat(cs.height);
     if (!isFinite(w) || !isFinite(hh) || w <= 0) return;
@@ -159,12 +160,16 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     const x = o.position.split("-")[1];
     const hx = x === "left" ? 0 : x === "right" ? Math.max(0, w - sz.cw) : Math.max(0, (w - sz.cw) / 2);
     row.style.transform = `translateX(${f2(hx)}px)`;
-    island.style.clipPath = `path('${outline(w, hh, sz.cw, sz.ch, hx)}')`;
+    island.style.clipPath = `path('${card ? outline(w, hh, sz.cw, sz.ch, hx) : outline(w, hh, w, hh, 0)}')`;
   }
   function shapeLoop() {
     cancelAnimationFrame(raf);
     const end = performance.now() + 1300;
-    const f = () => { shape(); if (performance.now() < end) raf = requestAnimationFrame(f); };
+    const f = () => {
+      shape();
+      if (performance.now() < end) raf = requestAnimationFrame(f);
+      else if (!isCard()) { island.style.clipPath = ""; row.style.transform = ""; }
+    };
     f();
   }
   function size() {
@@ -173,7 +178,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     island.style.width = w + "px";
     island.style.height = hh + "px";
     island.style.borderRadius = isCard() ? "0" : Math.min(hh / 2, 32) + "px";
-    if (isCard()) shapeLoop(); else { cancelAnimationFrame(raf); island.style.clipPath = ""; row.style.transform = ""; }
+    if (isCard()) shapeLoop(); else if (island.style.clipPath) shapeLoop();
   }
   function measure() {
     if (island.hidden) return;
