@@ -36,7 +36,7 @@ That is the whole setup: mount one `<Toaster />`, call `dynaura` from anywhere.
 | **Progress that feels alive** | A value bar and rolling digits, updated in place with `dynaura.update`.                                                                     |
 | **Built for touch**           | Swipe to dismiss, tap or long-press to pin, hover to pause.                                                                                 |
 | **Themeable**                 | Dark, light, system, or your own colors. Everything is a CSS variable.                                                                      |
-| **Any framework**             | React, Vue, Svelte, or plain JS, all on one shared core.                                                                                    |
+| **Any framework**             | React, Vue, Svelte, Solid, Angular, or plain JS, all on one shared core.                                                                                    |
 | **Light and accessible**      | Zero dependencies, typed, `aria-live`, and `prefers-reduced-motion` respected.                                                              |
 
 ## Install
@@ -105,6 +105,37 @@ import "dynaura/styles.css";
 <div use:toaster={{ position: "top", theme: "system" }} />
 <button on:click={() => dynaura.success("Saved")}>Save</button>
 ```
+
+</details>
+
+<details>
+<summary><b>Solid</b></summary>
+
+```tsx
+import { Toaster, dynaura } from "dynaura/solid";
+import "dynaura/styles.css";
+
+<Toaster position="top" theme="system" />;
+<button onClick={() => dynaura.success("Saved")}>Save</button>;
+```
+
+</details>
+
+<details>
+<summary><b>Angular</b></summary>
+
+```ts
+import { Component } from "@angular/core";
+import { dynaura, injectToaster } from "dynaura/angular";
+
+@Component({ selector: "app-root", standalone: true, template: `<button (click)="save()">Save</button>` })
+export class AppComponent {
+  toaster = injectToaster({ position: "top", theme: "system" }); // call once, in the root component
+  save() { dynaura.success("Saved"); }
+}
+```
+
+Add `dynaura/styles.css` to `styles` in `angular.json`. `injectToaster` is a no-op on the server and cleans up with the component.
 
 </details>
 
@@ -202,6 +233,23 @@ Card content inherits the toast colors through `var(--dynaura-fg)`, `var(--dynau
 dynaura.info({ title: "Invite sent to Maya", queue: true, duration: 1600 });
 ```
 
+### Undo, custom bodies, click and pause
+
+```ts
+// secondary action next to the button (both dismiss the toast after the click)
+dynaura.success({ title: "Deleted", button: { title: "Close", onClick() {} }, secondaryButton: { title: "Undo", onClick: restore } });
+
+// fully custom body, no title row and no card variant. Same options otherwise.
+dynaura.custom(myNode, { duration: 5000 });
+
+// tap the island itself
+dynaura.info({ title: "New message", onClick: () => openInbox() });
+
+// freeze all timers while a modal is open
+dynaura.pause();
+dynaura.resume();
+```
+
 ### Custom icons and trailing slots
 
 ```tsx
@@ -225,7 +273,9 @@ dynaura.info({
 | `live(opts)`                                               | Live activity: sticky, with a running timer (default) or a waveform (`kind: "wave"`).     |
 | `promise(promise, { loading, success, error })`            | Morphs loading into success or error. Returns the original promise.                       |
 | `update(id, patch)`                                        | Patch a toast in place, including `type`. Also works on queued toasts.                    |
-| `dismiss(id?)`                                             | Dismiss the current toast (the next queued one shows) or a specific id.                   |
+| `custom(node, opts?)`                                      | Fully custom body (string, DOM `Node`, or React node). `opts` are the usual toast options.  |
+| `pause()` / `resume()`                                     | Freeze or release every timer. Toasts shown while paused start frozen.                    |
+| `dismiss(id?, reason?)`                                    | Dismiss the current toast (the next queued one shows) or a specific id. `reason` defaults to `"api"`. |
 | `clear()`                                                  | Dismiss everything, including the queue.                                                  |
 
 ### Toast options
@@ -243,6 +293,15 @@ dynaura.info({
 | `kind`        | `"timer" \| "wave"`           | `"timer"`         | Flavor of a `live` toast.                                               |
 | `variant`     | `"default" \| "card"`         | `"default"`       | `"card"`: header tab plus a full-bleed custom body.                     |
 | `queue`       | `boolean`                     | Toaster's `queue` | Per-toast override of the Toaster option.                               |
+| `secondaryButton` | `{ title, onClick }`      |                   | Second action next to `button`, e.g. Undo. Dismisses after the click.   |
+| `custom`      | same                          |                   | Replaces the title row with your own body. Prefer `dynaura.custom()`.   |
+| `onClick`     | `() => void`                  |                   | Tap or click on the island itself (not its buttons). Pointer only: put keyboard-reachable actions in `button`. |
+| `id`          | `string`                      | auto-numbered     | Custom key. Showing a toast with a live `id` updates it instead of stacking. |
+| `className`   | `string`                      |                   | Extra class(es) on the island, for this toast only.                     |
+| `style`       | `Record<string, string \| number>` |             | Inline styles on the island for this toast. CSS variables work, e.g. `{ "--dynaura-bg": "#123" }`. |
+| `onShow`      | `() => void`                  |                   | Fires when the toast becomes visible.                                   |
+| `onDismiss`   | `(reason) => void`            |                   | Fires when it ends. `reason`: `"timeout" \| "swipe" \| "button" \| "escape" \| "api"`. |
+| `onAutoClose` | `() => void`                  |                   | Fires when it ends because `duration` ran out.                          |
 
 > Strings are always inserted as text, never as HTML.
 > React nodes work in the React adapter. Vue, Svelte and vanilla accept strings or DOM nodes.
@@ -251,14 +310,17 @@ dynaura.info({
 
 | Option     | Type                                                                           | Default  | Description                                              |
 | ---------- | ------------------------------------------------------------------------------ | -------- | -------------------------------------------------------- |
-| `position` | `"top"` `"top-left"` `"top-right"` `"bottom"` `"bottom-left"` `"bottom-right"` | `"top"`  | Where the island sits.                                   |
+| `position` | `"top"` `"top-left"` `"top-right"` `"top-start"` `"top-end"` and the `bottom` set | `"top"`  | Where the island sits. `start` / `end` flip in RTL pages.  |
 | `offset`   | `number`                                                                       | `12`     | Pixels from the screen edge. Safe-area insets are added. |
 | `theme`    | `"dark" \| "light" \| "system" \| CustomTheme`                                 | `"dark"` | See [Theming](#theming).                                 |
 | `queue`    | `boolean`                                                                      | `false`  | Show toasts one after another.                           |
+| `maxQueue` | `number`                                                                       | `Infinity` | With `queue`: max waiting toasts. The oldest is dropped beyond it. |
+| `dedupe`   | `"id" \| "title"`                                                              | `"id"`   | `"id"`: a repeated custom `id` updates in place. `"title"`: a repeated title does too. |
+| `swipe`    | `"edge" \| "up" \| "down" \| "both" \| "none"`                                  | `"edge"` | Drag-to-dismiss direction. `both` = either vertical way. |
 | `timer`    | `boolean`                                                                      | `true`   | Thin time-remaining bar on timed toasts.                 |
 | `haptics`  | `boolean`                                                                      | `true`   | `navigator.vibrate` on show. A no-op where unsupported.  |
 
-Mount **one** Toaster per page.
+Mount **one** Toaster per page. In development a second one logs a `console.warn`.
 
 ### Entry points
 
@@ -267,12 +329,15 @@ Mount **one** Toaster per page.
 | `dynaura`            | React: `Toaster`, `dynaura`          |
 | `dynaura/vue`        | Vue 3: `Toaster`, `dynaura`          |
 | `dynaura/svelte`     | Svelte: `toaster` action, `dynaura`  |
+| `dynaura/solid`      | Solid: `Toaster`, `dynaura`          |
+| `dynaura/angular`    | Angular: `injectToaster`, `dynaura`  |
 | `dynaura/vanilla`    | Plain JS: `createToaster`, `dynaura` |
 | `dynaura/styles.css` | The stylesheet. Import it once.      |
+| `dynaura/styles-no-font.css` | Same, without the Google Fonts `@import`. |
 
 ### TypeScript
 
-Types ship with the package: `ToastOptions`, `ToastType`, `ToasterProps`, `CustomTheme`, `Position` and `Content`.
+Types ship with the package: `ToastOptions`, `ToastType`, `ToasterProps`, `CustomTheme`, `Position`, `DismissReason` and `Content`.
 
 ```ts
 import type { ToastOptions, CustomTheme } from "dynaura";
@@ -285,7 +350,8 @@ import type { ToastOptions, CustomTheme } from "dynaura";
 | **Hover** (mouse)                | Expands and pauses the timer. Leaving resumes with the exact time left. |
 | **Tap**                          | Pins an expandable toast open and paused. Tap outside to unpin.         |
 | **Long-press**                   | Pins, with haptic feedback.                                             |
-| **Swipe** toward the screen edge | Dismisses. A short swipe snaps back.                                    |
+| **Swipe** toward the screen edge | Dismisses. A short swipe snaps back. Direction is set by `swipe`.       |
+| **Escape**                       | Dismisses the current toast.                                            |
 
 ## Theming
 
@@ -309,11 +375,12 @@ Everything is a CSS variable, so you can also override styles directly:
 
 ### Font
 
-The default font is [Bricolage Grotesque](https://fonts.google.com/specimen/Bricolage+Grotesque). `dynaura/styles.css` loads it from Google Fonts with an `@import` on its first line. To self-host or skip the request, copy the stylesheet without that line and set `--dynaura-font`.
+The default font is [Bricolage Grotesque](https://fonts.google.com/specimen/Bricolage+Grotesque). `dynaura/styles.css` loads it from Google Fonts with an `@import` on its first line. To self-host or skip the request, import `dynaura/styles-no-font.css` instead (same stylesheet, no `@import`) and set `--dynaura-font`.
 
 ## Accessibility
 
-- The island has `role="status"` and `aria-live="polite"`.
+- The island has `role="status"` and `aria-live="polite"`. Error toasts switch to `role="alert"` and `aria-live="assertive"`.
+- `Escape` dismisses the current toast.
 - Action buttons are keyboard focusable, with a visible focus ring.
 - Under `prefers-reduced-motion: reduce`, motion is cut to near-instant. Loading spinners keep spinning.
 - Rolling digits expose their value through `aria-label`.
@@ -323,7 +390,7 @@ The default font is [Bricolage Grotesque](https://fonts.google.com/specimen/Bric
 
 Modern evergreen browsers. The morph uses CSS `linear()` easing (Chrome 113+, Safari 17.2+, Firefox 112+) and `color-mix()`. Older browsers fall back to a bounce curve. Without `color-mix()` support, tinted backgrounds fall back to a neutral tint.
 
-Tested in Chrome and WebKit with Playwright. Firefox has not been verified yet.
+Smoke-tested in Chrome and WebKit with Playwright (`npm run test:e2e`). Firefox has not been verified yet: run `node test/e2e.mjs firefox` and report back.
 
 ## Troubleshooting
 
@@ -337,7 +404,7 @@ Check that `<Toaster />` is mounted once and that `dynaura/styles.css` is import
 <details>
 <summary><b>The font is wrong, or I need to avoid Google Fonts</b></summary>
 
-The stylesheet's first line is an `@import` for Bricolage Grotesque. Copy the stylesheet without it, or set `--dynaura-font` to your own font. This is also the fix for a strict Content Security Policy.
+The stylesheet's first line is an `@import` for Bricolage Grotesque. Import `dynaura/styles-no-font.css` instead, and set `--dynaura-font` to your own font. This is also the fix for a strict Content Security Policy.
 
 </details>
 
@@ -378,6 +445,7 @@ npm install
 npm run dev     # local test playground (not the docs site): imports src/ directly
 npm test        # vitest + jsdom
 npm run build   # tsup, outputs dist/
+npm run test:e2e -- chrome   # real-browser smoke test (needs playwright-core; also: firefox, webkit)
 ```
 
 The playground at `http://localhost:5173` exercises every feature: themes (with live color pickers for custom), positions, queue, the timer bar, rich cards, and copyable code for each example. The code shown there comes from the files that run, so it cannot drift.
@@ -389,7 +457,7 @@ The playground at `http://localhost:5173` exercises every feature: themes (with 
 - **Size morph.** The core measures the compact row and the expanded content, then transitions `width`, `height` and `border-radius` between them with a CSS `linear()` spring.
 - **Card variant.** The header tab and body are drawn as one `clip-path`. The core recomputes the outline every frame while the size transitions.
 - **Timers.** Remaining time is tracked, so hover, drag and pin pause and resume exactly. The timer bar is a CSS animation that pauses with them.
-- **Adapters.** Vue, Svelte and vanilla are thin wrappers over `createToaster()`. React adds portals so `description`, `icon` and `trailing` can be React nodes.
+- **Adapters.** Vue, Svelte, Solid, Angular and vanilla are thin wrappers over `createToaster()`. React adds portals so `description`, `icon` and `trailing` can be React nodes.
 
 </details>
 

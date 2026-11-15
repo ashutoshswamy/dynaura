@@ -1,10 +1,14 @@
 import { burst } from "./confetti";
-import { dynaura, getCurrent, setQueue, subscribe } from "./store";
-import type { Content, Toast, ToastType } from "./store";
+import { dynaura, getCurrent, isPaused, setQueue, setQueueOpts, subscribe } from "./store";
+import type { Content, Dedupe, Toast, ToastType } from "./store";
+
+declare const process: { env: { NODE_ENV?: string } }; // replaced by bundlers; guarded by try/catch below
 
 export type Position =
   | "top" | "top-left" | "top-center" | "top-right"
-  | "bottom" | "bottom-left" | "bottom-center" | "bottom-right";
+  | "bottom" | "bottom-left" | "bottom-center" | "bottom-right"
+  /** logical: "start" / "end" flip with the page direction (RTL) */
+  | "top-start" | "top-end" | "bottom-start" | "bottom-end";
 
 /** Any CSS color. Omitted keys fall back to the dark theme. */
 export interface CustomTheme {
@@ -24,6 +28,12 @@ export interface ToasterOptions {
   haptics?: boolean;
   /** show toasts one after another instead of replacing (default false) */
   queue?: boolean;
+  /** with `queue`: max toasts waiting; the oldest waiting one is dropped beyond it (default Infinity) */
+  maxQueue?: number;
+  /** "id" (default): a repeated custom `id` updates in place. "title": a repeated title does too. */
+  dedupe?: Dedupe;
+  /** drag-to-dismiss: "edge" toward the anchored screen edge (default), "up", "down", "both" (either vertical way), "none" */
+  swipe?: "edge" | "up" | "down" | "both" | "none";
   /** framework hook: mount non-string/non-Node content (e.g. a React element) into `el`; node=null unmounts */
   render?: (el: HTMLElement, node: unknown) => void;
 }
@@ -97,9 +107,13 @@ function roll(e: HTMLElement, s: string) {
 }
 
 export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
-  const o = { position: "top", offset: 12, theme: "dark", timer: true, haptics: true, queue: false } as Required<Omit<ToasterOptions, "render">> & Pick<ToasterOptions, "render">;
+  const o = { position: "top", offset: 12, theme: "dark", timer: true, haptics: true, queue: false, maxQueue: Infinity, dedupe: "id", swipe: "edge" } as Required<Omit<ToasterOptions, "render">> & Pick<ToasterOptions, "render">;
   const merge = (n: ToasterOptions) => { for (const k in n) if ((n as any)[k] !== undefined) (o as any)[k] = (n as any)[k]; };
   merge(initial);
+  try {
+    if (process.env.NODE_ENV !== "production" && document.querySelector(".dynaura-root"))
+      console.warn("[dynaura] a Toaster is already mounted. Mount one per page; extra ones render every toast twice.");
+  } catch { /* no process in unbundled ESM: stay silent */ }
 
   // ---- DOM ----
   const root = h("div", "dynaura-root");
@@ -114,9 +128,13 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
   const trail = h("span", "dynaura-trailing", row);
   const body = h("div", "dynaura-body", inner);
   const desc = h("div", "dynaura-desc", body);
-  const btn = h("button", "dynaura-button", body) as HTMLButtonElement;
+  const actions = h("div", "dynaura-actions", body);
+  const btn = h("button", "dynaura-button", actions) as HTMLButtonElement;
+  const btn2 = h("button", "dynaura-button dynaura-secondary", actions) as HTMLButtonElement;
+  const cust = h("div", "dynaura-custom", inner);
   const bar = h("div", "dynaura-bar", island);
   island.hidden = true;
+  cust.hidden = true;
   island.dataset.expanded = "false";
   island.dataset.paused = "false";
   document.body.append(root);
@@ -128,11 +146,19 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
   let remaining = 0, startedAt = 0, liveStart = 0;
   let sz = { cw: 0, ch: 0, ew: 0, eh: 0 };
   let applied: string[] = [];
+  const custom = { cls: [] as string[], sty: [] as string[] }; // per-toast className / style currently on the island
   const hosts = new Map<HTMLElement, HTMLElement>();
 
+  let px = "center"; // resolved horizontal anchor: left | center | right
+  const place = () => {
+    const [y, x = "center"] = o.position.split("-");
+    const rtl = getComputedStyle(root).direction === "rtl";
+    px = x === "start" ? (rtl ? "right" : "left") : x === "end" ? (rtl ? "left" : "right") : x;
+    root.dataset.y = y; root.dataset.x = px;
+  };
   const dir = () => (o.position.startsWith("bottom") ? 1 : -1); // sign of "toward the screen edge" in y
-  const hasBody = () => !!t && ((t.description != null && typeof t.description !== "boolean") || !!t.button);
-  const paused = () => hovered || pinned || dragging;
+  const hasBody = () => !!t && t.custom == null && ((t.description != null && typeof t.description !== "boolean") || !!t.button || !!t.secondaryButton);
+  const paused = () => hovered || pinned || dragging || isPaused();
 
   // fill a slot; framework nodes go into a fresh host so later unmounts never touch live DOM
   function put(slot: HTMLElement, c: Content | undefined) {
@@ -157,8 +183,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     const w = parseFloat(cs.width), hh = parseFloat(cs.height);
     if (!isFinite(w) || !isFinite(hh) || w <= 0) return;
     // header tab follows the position: centered island, or flush to the left / right edge
-    const x = o.position.split("-")[1];
-    const hx = x === "left" ? 0 : x === "right" ? Math.max(0, w - sz.cw) : Math.max(0, (w - sz.cw) / 2);
+    const hx = px === "left" ? 0 : px === "right" ? Math.max(0, w - sz.cw) : Math.max(0, (w - sz.cw) / 2);
     row.style.transform = `translateX(${f2(hx)}px)`;
     island.style.clipPath = `path('${card ? outline(w, hh, sz.cw, sz.ch, hx) : outline(w, hh, w, hh, 0)}')`;
   }
@@ -182,7 +207,8 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
   }
   function measure() {
     if (island.hidden) return;
-    sz = { cw: row.offsetWidth, ch: row.offsetHeight, ew: inner.offsetWidth, eh: inner.offsetHeight };
+    const cu = !cust.hidden; // custom body: one size, expanded or not
+    sz = { cw: cu ? inner.offsetWidth : row.offsetWidth, ch: cu ? inner.offsetHeight : row.offsetHeight, ew: inner.offsetWidth, eh: inner.offsetHeight };
     size();
     if (!ready && sz.cw) requestAnimationFrame(() => { ready = true; island.dataset.ready = "true"; });
   }
@@ -208,7 +234,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     const id = t.id;
     startedAt = Date.now();
     collapseT = setTimeout(() => { if (!pinned) setExpanded(false); }, Math.max(0, remaining - 500));
-    dismissT = setTimeout(() => dynaura.dismiss(id), remaining);
+    dismissT = setTimeout(() => dynaura.dismiss(id, "timeout"), remaining);
   }
   function sync() {
     island.dataset.paused = String(paused());
@@ -229,6 +255,19 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
   function apply(n: Toast, p: Toast | null) {
     const ch = (k: keyof Toast) => !p || n[k] !== p[k];
     island.dataset.type = n.type;
+    island.dataset.clickable = String(!!n.onClick);
+    const cu = n.custom != null;
+    row.hidden = cu; cust.hidden = !cu;
+    if (ch("custom")) put(cust, n.custom);
+    // errors interrupt screen readers; everything else waits its turn
+    island.setAttribute("aria-live", n.type === "error" ? "assertive" : "polite");
+    island.setAttribute("role", n.type === "error" ? "alert" : "status");
+    custom.cls.forEach((c) => island.classList.remove(c));
+    custom.sty.forEach((k) => island.style.removeProperty(k));
+    custom.cls = n.className?.split(/\s+/).filter(Boolean) ?? [];
+    custom.sty = Object.keys(n.style ?? {}).map((k) => (k.startsWith("--") ? k : k.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase())));
+    island.classList.add(...custom.cls);
+    Object.values(n.style ?? {}).forEach((v, i) => island.style.setProperty(custom.sty[i], String(v)));
     island.dataset.variant = drag.dataset.variant = n.variant ?? "default";
     if (ch("type") || ch("icon") || ch("kind")) {
       put(badge, undefined);
@@ -246,7 +285,9 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     desc.hidden = n.description == null || typeof n.description === "boolean";
     btn.hidden = !n.button;
     if (n.button) btn.textContent = n.button.title;
-    body.hidden = !(n.description != null && typeof n.description !== "boolean") && !n.button;
+    btn2.hidden = !n.secondaryButton;
+    if (n.secondaryButton) btn2.textContent = n.secondaryButton.title;
+    body.hidden = cu || (!(n.description != null && typeof n.description !== "boolean") && !n.button && !n.secondaryButton);
     // bar: value progress, else time remaining
     bar.dataset.mode = n.progress != null ? "value" : n.duration != null ? "time" : "none";
     bar.style.setProperty("--p", String(n.progress ?? 0));
@@ -271,6 +312,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
   function render() {
     const n = getCurrent();
     const p = t;
+    if (n && n === p) { sync(); return; } // pause() / resume()
     if (!n) { if (p) leave(); return; }
     const same = !!p && p.id === n.id;
     if (same && onlyProgress(p!, n)) { // frequent progress updates: don't reset anything
@@ -279,6 +321,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     t = n;
     clearTimeout(hideT);
     if (island.hidden) { // entering from nothing
+      place();
       island.hidden = false;
       drag.style.transform = ""; drag.style.opacity = "";
       restart(island);
@@ -314,19 +357,25 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
       island.hidden = true; ready = false; expanded = false; row.style.transform = "";
       delete island.dataset.ready; island.dataset.expanded = "false";
       island.style.width = island.style.height = island.style.borderRadius = "";
-      [badge, trail, desc].forEach((s) => put(s, undefined));
+      [badge, trail, desc, cust].forEach((s) => put(s, undefined));
       delete trail.dataset.sig;
     }, 450);
   }
 
   btn.onclick = () => {
     const c = t;
-    if (c?.button) { c.button.onClick(); dynaura.dismiss(c.id); }
+    if (c?.button) { c.button.onClick(); dynaura.dismiss(c.id, "button"); }
+  };
+  btn2.onclick = () => {
+    const c = t;
+    if (c?.secondaryButton) { c.secondaryButton.onClick(); dynaura.dismiss(c.id, "button"); }
   };
 
   // ---- pointer: hover (mouse), tap-to-pin, long-press, swipe to dismiss ----
   // ponytail: swipe is vertical only (toward the anchored screen edge); add horizontal for corner positions if wanted.
   let sy = 0, t0 = 0, moved = false, longed = false;
+  const sign = () => (o.swipe === "up" ? -1 : o.swipe === "down" ? 1 : dir()); // y direction that dismisses
+  const dist = (dy: number) => (o.swipe === "both" ? Math.abs(dy) : dy * sign()); // distance in the dismiss direction
   island.addEventListener("pointerenter", (e) => { if ((e as PointerEvent).pointerType === "mouse") { hovered = true; sync(); } });
   island.addEventListener("pointerleave", (e) => {
     if ((e as PointerEvent).pointerType !== "mouse") return;
@@ -346,19 +395,20 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     if (!dragging) return;
     const dy = e.clientY - sy;
     if (Math.abs(dy) > 6) { moved = true; clearTimeout(lp); }
-    if (!moved) return;
-    const d = dy * dir();
-    const off = d > 0 ? d : -Math.sqrt(-d) * 4; // rubber-band when pulled the wrong way
-    drag.style.transform = `translateY(${off * dir()}px)`;
+    if (!moved || o.swipe === "none") return;
+    const d = dist(dy);
+    const off = o.swipe === "both" ? dy : (d > 0 ? d : -Math.sqrt(-d) * 4) * sign(); // rubber-band when pulled the wrong way
+    drag.style.transform = `translateY(${off}px)`;
   });
   const up = (e: PointerEvent) => {
     if (!dragging) return;
     dragging = false; clearTimeout(lp);
     drag.style.transition = "";
-    const d = (e.clientY - sy) * dir();
+    const d = dist(e.clientY - sy);
     const v = d / Math.max(1, Date.now() - t0);
-    if (e.type === "pointerup" && moved && (d > 40 || (v > 0.5 && d > 10)) && t) { dynaura.dismiss(t.id); return; }
+    if (e.type === "pointerup" && moved && (d > 40 || (v > 0.5 && d > 10)) && t && o.swipe !== "none") { dynaura.dismiss(t.id, "swipe"); return; }
     drag.style.transform = "";
+    if (e.type === "pointerup" && !moved && !longed) t?.onClick?.();
     if (e.type === "pointerup" && !moved && !longed && hasBody()) {
       pinned = !pinned;
       if (!pinned && !hovered) setExpanded(false);
@@ -371,13 +421,15 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     if (pinned && !island.contains(e.target as Node)) { pinned = false; if (!hovered) setExpanded(false); sync(); }
   };
   document.addEventListener("pointerdown", outside);
+  const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && t && !e.defaultPrevented) dynaura.dismiss(t.id, "escape"); };
+  document.addEventListener("keydown", esc);
 
   // ---- options ----
   function set(n: ToasterOptions) {
     merge(n);
     setQueue(o.queue);
-    const [y, x = "center"] = o.position.split("-");
-    root.dataset.y = y; root.dataset.x = x;
+    setQueueOpts(o.maxQueue, o.dedupe);
+    place();
     root.dataset.timer = String(o.timer);
     root.dataset.theme = typeof o.theme === "object" ? "custom" : o.theme;
     root.style.setProperty("--dynaura-offset", o.offset + "px");
@@ -399,8 +451,9 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     destroy() {
       unsub(); ro.disconnect(); cancelAnimationFrame(raf);
       document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", esc);
       clear(); [hideT, expandT, liveI, lp].forEach((x) => { clearTimeout(x); clearInterval(x); });
-      [badge, trail, desc].forEach((s) => put(s, undefined));
+      [badge, trail, desc, cust].forEach((s) => put(s, undefined));
       root.remove();
     },
   };

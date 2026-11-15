@@ -85,7 +85,7 @@
 .dynaura-inner { position: absolute; top: 0; left: 0; width: max-content; max-width: min(380px, 92vw); }
 .dynaura-island[data-expanded="true"] .dynaura-inner { min-width: min(320px, 92vw); }
 
-.dynaura-row { display: flex; align-items: center; gap: 12px; width: max-content; padding: 10px 20px 10px 12px; min-height: 44px; box-sizing: border-box; }
+.dynaura-row { display: flex; align-items: center; gap: 12px; width: max-content; padding: 10px 12px; padding-inline: 12px 20px; min-height: 44px; box-sizing: border-box; }
 .dynaura-island[data-expanded="true"] .dynaura-row { padding-top: 14px; }
 .dynaura-badge {
   display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; flex: none;
@@ -93,7 +93,7 @@
   animation: dynaura-pop 500ms var(--dynaura-spring) both;
 }
 .dynaura-title { white-space: nowrap; animation: dynaura-text 450ms ease-out both; }
-.dynaura-trailing { display: flex; align-items: center; margin-left: 4px; color: var(--dynaura-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dynaura-trailing { display: flex; align-items: center; margin-inline-start: 4px; color: var(--dynaura-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* rolling digits */
 .dynaura-digit, .dynaura-char { display: inline-block; height: 1.3em; line-height: 1.3em; }
@@ -103,13 +103,18 @@
 
 .dynaura-body { padding: 2px 20px 20px 20px; opacity: 0; filter: blur(6px); transform: translateY(-6px); transition: opacity 200ms ease, filter 200ms ease, transform 200ms ease; pointer-events: none; }
 .dynaura-island[data-expanded="true"] .dynaura-body { opacity: 1; filter: none; transform: none; pointer-events: auto; transition-duration: 450ms; transition-delay: 90ms; }
-.dynaura-desc { color: var(--dynaura-muted); font-weight: 400; line-height: 1.5; padding-left: 38px; }
+.dynaura-desc { color: var(--dynaura-muted); font-weight: 400; line-height: 1.5; padding-inline-start: 38px; }
 .dynaura-button {
-  all: unset; box-sizing: border-box; cursor: pointer; display: inline-block; margin: 16px 0 0 38px; padding: 8px 16px; border-radius: 999px;
+  all: unset; box-sizing: border-box; cursor: pointer; padding: 8px 16px; border-radius: 999px;
   background: var(--dynaura-btn); color: var(--state); font: 600 13px/1.3 var(--dynaura-font);
   transition: transform 200ms var(--dynaura-spring), background 150ms;
 }
+.dynaura-actions { display: flex; gap: 8px; margin: 16px 0 0; margin-inline-start: 38px; }
+.dynaura-secondary { color: var(--dynaura-muted); }
+.dynaura-custom { width: max-content; max-width: min(380px, 92vw); }
+.dynaura-island[data-clickable="true"] { cursor: pointer; }
 .dynaura-button:hover { background: var(--dynaura-btn); background: color-mix(in srgb, var(--state) 22%, transparent); }
+.dynaura-secondary:hover { background: var(--dynaura-ring); }
 .dynaura-button:active { transform: scale(0.94); }
 .dynaura-button:focus-visible { outline: 2px solid var(--state); outline-offset: 2px; }
 
@@ -121,13 +126,15 @@
 .dynaura-island[data-variant="card"][data-expanded="true"] .dynaura-inner { min-width: min(372px, 92vw); }
 .dynaura-island[data-variant="card"] .dynaura-body { padding: 18px 24px 24px; }
 .dynaura-island[data-variant="card"] .dynaura-desc { padding-left: 0; color: var(--dynaura-fg); font-weight: 400; line-height: 1.35; }
+.dynaura-island[data-variant="card"] .dynaura-actions { margin: 22px 0 0; }
 .dynaura-island[data-variant="card"] .dynaura-button {
-  display: block; width: 100%; margin: 22px 0 0; padding: 13px 16px; text-align: center;
+  flex: 1; padding: 13px 16px; text-align: center;
   background: var(--dynaura-btn); background: color-mix(in srgb, var(--state) 16%, transparent);
 }
 
 /* time-remaining / value bar */
 .dynaura-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--state); opacity: 0.55; transform-origin: left; pointer-events: none; }
+.dynaura-root:dir(rtl) .dynaura-bar { transform-origin: right; }
 .dynaura-bar[data-mode="none"] { display: none; }
 .dynaura-bar[data-mode="time"] { animation: dynaura-timer linear forwards; }
 .dynaura-island[data-paused="true"] .dynaura-bar[data-mode="time"] { animation-play-state: paused; }

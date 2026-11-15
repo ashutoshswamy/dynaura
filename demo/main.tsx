@@ -108,7 +108,8 @@ function Preview({ state, icon: I, title, trailing, button, children }: { state:
 
 /* ---------- data ---------- */
 const THEMES = ["dark", "light", "system", "custom"] as const;
-const POSITIONS: Position[] = ["top", "top-left", "top-right", "bottom", "bottom-left", "bottom-right"];
+const POSITIONS: Position[] = ["top", "top-left", "top-right", "top-start", "top-end", "bottom", "bottom-left", "bottom-right"];
+const SWIPES = ["edge", "up", "down", "both", "none"] as const;
 const DEFAULT_CUSTOM: Required<CustomTheme> = {
   background: "#2b1055", foreground: "#ffffff", muted: "#c9b8f5", ring: "#4a2c85", button: "#432478",
   success: "#7cffcb", error: "#ff7a90", warning: "#ffd666", info: "#a6c8ff", loading: "#b9a8e8", live: "#ffb86b",
@@ -148,6 +149,29 @@ import "dynaura/styles.css";
 
 <div use:toaster={{ position: "top", theme: "light" }} />
 <button on:click={() => dynaura.success("Saved")}>Save</button>`,
+  Solid: `import { Toaster, dynaura } from "dynaura/solid";
+import "dynaura/styles.css";
+
+export default function App() {
+  return (
+    <>
+      <Toaster position="top" theme="light" />
+      <button onClick={() => dynaura.success("Saved")}>Save</button>
+    </>
+  );
+}`,
+  Angular: `import { Component } from "@angular/core";
+import { dynaura, injectToaster } from "dynaura/angular";
+
+@Component({
+  selector: "app-root",
+  standalone: true,
+  template: \`<button (click)="save()">Save</button>\`,
+})
+export class AppComponent {
+  toaster = injectToaster({ position: "top", theme: "light" }); // once
+  save() { dynaura.success("Saved"); }
+}`,
   Vanilla: `import { createToaster, dynaura } from "dynaura/vanilla";
 import "dynaura/styles.css";
 
@@ -193,6 +217,15 @@ function App() {
   const [position, setPosition] = useState<Position>("top");
   const [queue, setQueue] = useState(false);
   const [timer, setTimer] = useState(true);
+  const [swipe, setSwipe] = useState<(typeof SWIPES)[number]>("edge");
+  const [cap, setCap] = useState(false);
+  const [byTitle, setByTitle] = useState(false);
+  const [log, setLog] = useState<string[]>([]);
+  const [clicks, setClicks] = useState(0);
+  const [frozen, setFrozen] = useState(false);
+  const [rtl, setRtl] = useState(false);
+  const saves = useRef(0);
+  useEffect(() => { document.documentElement.dir = rtl ? "rtl" : "ltr"; }, [rtl]);
   const [custom, setCustom] = useState<Required<CustomTheme>>(DEFAULT_CUSTOM);
   const themeProp: ToasterProps["theme"] = theme === "custom" ? custom : theme;
 
@@ -264,7 +297,7 @@ function App() {
 
   return (
     <>
-      <Toaster theme={themeProp} position={position} queue={queue} timer={timer} />
+      <Toaster theme={themeProp} position={position} queue={queue} timer={timer} swipe={swipe} maxQueue={cap ? 2 : undefined} dedupe={byTitle ? "title" : "id"} />
 
       <div className="strip">
         <div className="wrap"><span>Local test playground. Run it with <code>npm run dev</code>; it imports <code>src/</code> directly. This is not the docs site.</span></div>
@@ -296,6 +329,9 @@ function App() {
           <label><span className="lab" title="Position"><ViewfinderCircleIcon strokeWidth={1.8} aria-hidden="true" /><span className="vh">Position</span></span><Seg label="Position" value={position} options={POSITIONS} onChange={setPosition} /></label>
           <Switch icon={QueueListIcon} label="Queue" on={queue} set={setQueue} />
           <Switch icon={ClockIcon} label="Timer bar" on={timer} set={setTimer} />
+          <label><span className="lab" title="Swipe direction"><ArrowsUpDownIcon strokeWidth={1.8} aria-hidden="true" /><span className="vh">Swipe</span></span><Seg label="Swipe" value={swipe} options={[...SWIPES]} onChange={setSwipe} /></label>
+          <Switch icon={QueueListIcon} label="Max 2 queued" on={cap} set={setCap} />
+          <Switch icon={QueueListIcon} label="Dedupe titles" on={byTitle} set={setByTitle} />
         </div>
       </div>
 
@@ -533,11 +569,81 @@ dynaura.update(id, {
         </section>
 
         <section className="sec">
+          <SectionHead title="New in 0.2" lead="Callbacks, ids, custom bodies, a second button, pause, RTL. Swipe, queue cap and dedupe are in the bar above." />
+          <div className="exs">
+            <Example title="Two actions" blurb="A secondary button next to the primary one."
+              code={`dynaura.success({
+  title: "File deleted",
+  button: { title: "Open trash", onClick: openTrash },
+  secondaryButton: { title: "Undo", onClick: restore },
+  duration: 6000,
+});`}
+              action={<Btn f={() => dynaura.success({ title: "File deleted", description: "report-final.pdf moved to trash.", button: { title: "Open trash", onClick: () => {} }, secondaryButton: { title: "Undo", onClick: () => {} }, duration: 6000 })}>Delete file</Btn>}>
+              <div className="row"><span className="dot">PDF</span><b>report-final.pdf</b><span className="sp">2.4 MB</span></div>
+            </Example>
+
+            <Example title="Custom body" blurb="Your own markup, no title row, no card."
+              code={`dynaura.custom(<Volume level={64} />, { duration: 3000 });`}
+              action={<Btn f={() => dynaura.custom(<div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", minWidth: 200 }}><b>Volume</b><div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(128,128,128,.35)" }}><div style={{ width: "64%", height: "100%", borderRadius: 3, background: "currentColor" }} /></div><span>64</span></div>, { duration: 3000 })}>Show volume</Btn>}>
+              <div className="row"><span className="dot"><ArrowsUpDownIcon strokeWidth={1.8} /></span><b>Anything fits</b><span className="sp">strings, nodes, components</span></div>
+            </Example>
+
+            <Example title="Update by id" blurb="Same id updates in place instead of stacking. Spam it."
+              code={`dynaura.info({ id: "save", title: \`Saved \${++n} times\` });`}
+              action={<Btn f={() => dynaura.info({ id: "save", title: `Saved ${++saves.current} times` })}>Save</Btn>}>
+              <div className="row"><b>One toast, one id</b><span className="sp">timer restarts on each save</span></div>
+            </Example>
+
+            <Example title="Lifecycle" blurb="onShow, onDismiss(reason) and onAutoClose. Wait, swipe, press Escape or use Undo."
+              code={`dynaura.info({
+  title: "Watch the log",
+  duration: 3000,
+  button: { title: "Got it", onClick() {} },
+  onShow: () => log("show"),
+  onDismiss: (reason) => log("dismiss: " + reason),
+  onAutoClose: () => log("auto close"),
+});`}
+              action={<Btn f={() => { setLog([]); const add = (m: string) => setLog((l) => [...l, m]); dynaura.info({ title: "Watch the log", duration: 3000, button: { title: "Got it", onClick() {} }, onShow: () => add("show"), onDismiss: (r) => add("dismiss: " + r), onAutoClose: () => add("auto close") }); }}>Show toast</Btn>}>
+              <div className="row"><b>Log</b><span className="sp">{log.length ? log.join(" → ") : "nothing yet"}</span></div>
+            </Example>
+
+            <Example title="Click the island" blurb="onClick fires on a tap, not on its buttons."
+              code={`dynaura.info({ title: "Tap me", onClick: () => setClicks((n) => n + 1) });`}
+              action={<Btn f={() => dynaura.info({ title: "Tap me", duration: 6000, onClick: () => setClicks((n) => n + 1) })}>Show toast</Btn>}>
+              <div className="row"><b>Taps</b><span className="sp">{clicks}</span></div>
+            </Example>
+
+            <Example title="Pause and resume" blurb="Freeze every timer while something else needs attention."
+              code={`dynaura.pause();   // e.g. a modal opens
+dynaura.resume();  // and closes`}
+              action={<><Btn f={() => dynaura.info({ title: "Timer running", duration: 4000 })}>Show toast</Btn><Btn ghost f={() => { frozen ? dynaura.resume() : dynaura.pause(); setFrozen(!frozen); }}>{frozen ? "Resume" : "Pause"}</Btn></>}>
+              <div className="row"><b>Timers</b><span className="sp">{frozen ? "frozen" : "running"}</span></div>
+            </Example>
+
+            <Example title="Per-toast style" blurb="className and style, no global CSS."
+              code={`dynaura.success({
+  title: "Purple, just this once",
+  className: "mine",
+  style: { "--dynaura-bg": "#2b1055", "--dynaura-fg": "#fff", "--dynaura-success": "#7cffcb" },
+});`}
+              action={<Btn f={() => dynaura.success({ title: "Purple, just this once", className: "mine", style: { "--dynaura-bg": "#2b1055", "--dynaura-fg": "#fff", "--dynaura-success": "#7cffcb" } })}>Show toast</Btn>}>
+              <div className="row"><b>Scoped</b><span className="sp">the next toast is normal again</span></div>
+            </Example>
+
+            <Example title="Right to left" blurb="start and end follow the page direction."
+              code={`<Toaster position="top-start" />  // left in LTR, right in RTL`}
+              action={<Btn f={() => { setRtl(!rtl); setPosition("top-start"); dynaura.info({ title: rtl ? "Left to right" : "من اليمين إلى اليسار" }); }}>{rtl ? "Switch to LTR" : "Switch to RTL"}</Btn>}>
+              <div className="row"><b>Direction</b><span className="sp">{rtl ? "rtl" : "ltr"}</span></div>
+            </Example>
+          </div>
+        </section>
+
+        <section className="sec">
           <SectionHead title="Gestures" lead="Hover, pin and swipe work the same on every toast." />
           <div className="gest">
             <div><h3><CursorArrowRaysIcon strokeWidth={1.8} />Hover</h3><p>Expands the island and pauses the timer. Leave and it resumes with the exact time left.</p></div>
             <div><h3><FingerPrintIcon strokeWidth={1.8} />Tap or long-press</h3><p>Pins an expandable toast open. Tap anywhere else to let go.</p></div>
-            <div><h3><ArrowsUpDownIcon strokeWidth={1.8} />Swipe</h3><p>Flick toward the screen edge to dismiss. A short pull snaps back.</p></div>
+            <div><h3><ArrowsUpDownIcon strokeWidth={1.8} />Swipe</h3><p>Flick toward the screen edge to dismiss, or set the direction in the bar. A short pull snaps back. Escape dismisses too.</p></div>
           </div>
         </section>
 

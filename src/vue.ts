@@ -17,6 +17,9 @@ export const Toaster = defineComponent({
     timer: { type: Boolean, default: undefined },
     haptics: { type: Boolean, default: undefined },
     queue: { type: Boolean, default: undefined },
+    maxQueue: Number,
+    dedupe: String,
+    swipe: String,
   },
   setup(props) {
     let c: ToasterHandle | undefined;

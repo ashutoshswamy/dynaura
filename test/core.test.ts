@@ -138,3 +138,57 @@ test("timer bar: duration survives the animation restart; modes; timer=false fla
   c.set({ timer: false });
   expect($(".dynaura-root").dataset.timer).toBe("false");
 });
+
+test("escape dismisses; errors are assertive; per-toast className/style are scoped", () => {
+  const onDismiss = vi.fn(), onAutoClose = vi.fn();
+  dynaura.error({ title: "bad", className: "mine", style: { "--dynaura-bg": "red" }, onDismiss, onAutoClose });
+  expect(island().getAttribute("aria-live")).toBe("assertive");
+  expect(island().classList.contains("mine")).toBe(true);
+  expect(island().style.getPropertyValue("--dynaura-bg")).toBe("red");
+  ev(document.body, "keydown", { key: "Escape" });
+  expect(onDismiss).toHaveBeenCalledWith("escape");
+  expect(onAutoClose).not.toHaveBeenCalled();
+  dynaura.info("next");
+  expect(island().getAttribute("aria-live")).toBe("polite");
+  expect(island().classList.contains("mine")).toBe(false);
+  expect(island().style.getPropertyValue("--dynaura-bg")).toBe("");
+});
+
+test("secondary button, onClick, custom body, pause", () => {
+  const undo = vi.fn(), click = vi.fn(), done = vi.fn();
+  dynaura.success({ title: "Deleted", button: { title: "OK", onClick: () => {} }, secondaryButton: { title: "Undo", onClick: undo }, onClick: click, onDismiss: done });
+  const b2 = $<HTMLButtonElement>(".dynaura-secondary");
+  expect(b2.hidden).toBe(false);
+  expect(b2.textContent).toBe("Undo");
+  b2.click();
+  expect(undo).toHaveBeenCalled();
+  expect(done).toHaveBeenCalledWith("button");
+
+  const el = document.createElement("b"); el.textContent = "mine";
+  dynaura.custom(el, { duration: 3000 });
+  expect(island().querySelector(".dynaura-custom")!.contains(el)).toBe(true);
+  expect($(".dynaura-row").hidden).toBe(true);
+  expect(island().dataset.clickable).toBe("false");
+
+  dynaura.pause();
+  expect(island().dataset.paused).toBe("true");
+  vi.advanceTimersByTime(10000);
+  expect(island().dataset.open).toBe("true"); // frozen
+  dynaura.resume();
+  vi.advanceTimersByTime(3100);
+  expect(island().dataset.open).toBe("false");
+});
+
+test("logical positions follow direction; second Toaster warns", () => {
+  c.set({ position: "top-start" });
+  expect($(".dynaura-root").dataset.x).toBe("left");
+  $(".dynaura-root").style.direction = "rtl"; // jsdom does not inherit direction
+  c.set({ position: "bottom-end" });
+  expect($(".dynaura-root").dataset.x).toBe("left");
+  c.set({ position: "top-start" });
+  expect($(".dynaura-root").dataset.x).toBe("right");
+  const w = vi.spyOn(console, "warn").mockImplementation(() => {});
+  createToaster().destroy();
+  expect(w).toHaveBeenCalledOnce();
+  w.mockRestore();
+});

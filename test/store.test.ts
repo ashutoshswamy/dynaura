@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { dynaura, getCurrent, setQueue } from "../src/store";
 
 beforeEach(() => { setQueue(false); dynaura.clear(); });
@@ -45,4 +45,43 @@ test("promise morphs loading -> success / error", async () => {
 test("live defaults: sticky + timer", () => {
   dynaura.live("Recording");
   expect(getCurrent()).toMatchObject({ type: "live", duration: null, kind: "timer" });
+});
+
+test("custom id dedupes; callbacks report why a toast ended", () => {
+  const log: string[] = [];
+  const o = { id: "save", onShow: () => log.push("show"), onDismiss: (r: string) => log.push(r), onAutoClose: () => log.push("auto") };
+  dynaura.info({ ...o, title: "a" });
+  expect(dynaura.info({ ...o, title: "b" })).toBe("save"); // updated, not stacked
+  expect(getCurrent()?.title).toBe("b");
+  dynaura.dismiss("save", "timeout");
+  expect(getCurrent()).toBeNull();
+  expect(log).toEqual(["show", "timeout", "auto"]);
+  dynaura.info({ ...o, title: "c" });
+  dynaura.dismiss("save");
+  expect(log.slice(3)).toEqual(["show", "api"]);
+});
+
+test("maxQueue drops the oldest waiting toast; dedupe:title updates in place", async () => {
+  const { setQueueOpts } = await import("../src/store");
+  setQueue(true);
+  setQueueOpts(1, "id");
+  dynaura.info("cur");
+  const dropped = vi.fn();
+  dynaura.info({ title: "w1", onDismiss: dropped });
+  dynaura.info("w2");
+  expect(dropped).toHaveBeenCalledWith("api");
+  dynaura.dismiss();
+  expect(getCurrent()?.title).toBe("w2");
+  setQueueOpts(Infinity, "title");
+  const a = dynaura.info("same");
+  expect(dynaura.info("same")).toBe(a);
+  setQueueOpts(Infinity, "id");
+});
+
+test("custom() and pause() state", async () => {
+  const { isPaused } = await import("../src/store");
+  dynaura.custom("hi", { id: "c" });
+  expect(getCurrent()?.custom).toBe("hi");
+  dynaura.pause(); expect(isPaused()).toBe(true);
+  dynaura.resume(); expect(isPaused()).toBe(false);
 });
