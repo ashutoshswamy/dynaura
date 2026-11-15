@@ -1,6 +1,6 @@
 {
   "name": "dynaura",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Dynamic Island style toasts. Spring-morphing, swipeable, themeable, zero dependencies. React, Vue, Svelte, Solid, Angular, vanilla.",
   "license": "MIT",
   "type": "module",

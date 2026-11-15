@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com). Versions follow semver (0.x: minor bumps may change behavior).
 
+## 0.2.1 - 2026-11-15
+
+### Fixed
+- A running toast no longer slips behind the new page during a View Transition (e.g. framework page navigation) and pops back afterwards. The island now has its own `view-transition-name: dynaura`, so it stays on top. Keep one Toaster per page: duplicate transition names make the browser skip the transition.
+
 ## 0.2.0 - 2026-11-15
 
 ### Added

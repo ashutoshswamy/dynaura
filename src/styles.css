@@ -31,6 +31,11 @@
     --dynaura-spring: linear(0, 0.0308, 0.1098, 0.2188, 0.3433, 0.4716, 0.5951, 0.708, 0.8066, 0.8891, 0.9552, 1.0055, 1.0416, 1.0651, 1.0784, 1.0833, 1.0821, 1.0763, 1.0677, 1.0576, 1.0468, 1.0364, 1.0267, 1.0181, 1.0109, 1.005, 1.0005, 0.9972, 0.995, 0.9937, 0.9931, 0.9931, 0.9935, 0.9941, 0.995, 0.9959, 0.9967, 0.9976, 0.9983, 0.9989, 0.9995, 0.9999, 1.0002, 1.0004, 1.0005, 1.0006, 1.0006, 1.0006, 1);
   }
 }
+/* View Transitions (e.g. page navigation): without its own name the island is flattened into the page snapshot and the new page paints over it until the transition ends. */
+.dynaura-root { view-transition-name: dynaura; }
+::view-transition-group(dynaura) { animation: none; z-index: 2147483647; }
+::view-transition-old(dynaura) { display: none; }
+::view-transition-new(dynaura) { animation: none; }
 .dynaura-root [hidden] { display: none !important; }
 .dynaura-root[data-theme="light"] {
   --dynaura-bg: #fff; --dynaura-fg: #111; --dynaura-muted: rgba(0, 0, 0, 0.55);

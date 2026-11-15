@@ -68,6 +68,7 @@ await page.evaluate(() => dynaura.custom(Object.assign(document.createElement("d
 await page.waitForTimeout(800);
 const cb = await isl.boundingBox();
 check(cb && cb.width > 100, "custom body sizes the island");
+check(await page.evaluate(() => getComputedStyle(document.querySelector(".dynaura-root")).viewTransitionName) === "dynaura", "island has its own view-transition-name");
 check(errors.length === 0, `no console/page errors${errors.length ? ": " + errors[0] : ""}`);
 
 await browser.close();

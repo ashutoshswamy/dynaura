@@ -412,7 +412,7 @@ The stylesheet's first line is an `@import` for Bricolage Grotesque. Import `dyn
 <details>
 <summary><b>Can I have more than one Toaster?</b></summary>
 
-No. State is a single global, so mount one Toaster per page.
+No. State is a single global, so mount one Toaster per page. In development a second one logs a `console.warn`, and it would break page (View) transitions.
 
 </details>
 
