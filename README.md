@@ -32,6 +32,7 @@ That is the whole setup: mount one `<Toaster />`, call `dynaura` from anywhere.
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | **One island, real motion**   | A single pill morphs between compact and expanded using a CSS `linear()` spring. No animation library.                                      |
 | **Rich cards**                | `variant: "card"` turns the toast into a header tab plus any custom body, joined by a curved notch. Flight passes, ride trackers, receipts. |
+| **Actions and callbacks**     | Primary and secondary buttons (undo), `onShow` / `onDismiss(reason)` / `onAutoClose`, `onClick`, custom ids that update instead of stacking.    |
 | **Live activities**           | Sticky toasts with a running timer or an animated waveform.                                                                                 |
 | **Progress that feels alive** | A value bar and rolling digits, updated in place with `dynaura.update`.                                                                     |
 | **Built for touch**           | Swipe to dismiss, tap or long-press to pin, hover to pause.                                                                                 |
@@ -216,12 +217,12 @@ dynaura.info({
   trailing: "40 min",
   variant: "card",
   duration: 9000,
-  description: <BoardingPass />, // any React node (or a DOM Node in Vue, Svelte and vanilla)
+  description: <BoardingPass />, // any React node (or a DOM Node in Vue, Svelte, Solid, Angular and vanilla)
   button: { title: "Show boarding pass", onClick: openPass },
 });
 ```
 
-Card content inherits the toast colors through `var(--dynaura-fg)`, `var(--dynaura-muted)` and `var(--state)`, so it follows any theme. It looks best with `theme="light"`. The header tab follows `position`: centered for `top` and `bottom`, flush to the edge for `-left` and `-right`.
+Card content inherits the toast colors through `var(--dynaura-fg)`, `var(--dynaura-muted)` and `var(--state)`, so it follows any theme. It looks best with `theme="light"`. The header tab follows `position`: centered for `top` and `bottom`, flush to the edge for `-left`, `-right`, `-start` and `-end`.
 
 ### Queue
 
@@ -304,7 +305,7 @@ dynaura.info({
 | `onAutoClose` | `() => void`                  |                   | Fires when it ends because `duration` ran out.                          |
 
 > Strings are always inserted as text, never as HTML.
-> React nodes work in the React adapter. Vue, Svelte and vanilla accept strings or DOM nodes.
+> React nodes work in the React adapter. Vue, Svelte, Solid, Angular and vanilla accept strings or DOM nodes.
 
 ### `<Toaster />` and `createToaster()` options
 
@@ -430,9 +431,9 @@ Add `viewport-fit=cover` to your viewport meta tag. dynaura adds `env(safe-area-
 </details>
 
 <details>
-<summary><b>My description is a React component but it does not show in Vue or Svelte</b></summary>
+<summary><b>My description is a React component but it does not show outside React</b></summary>
 
-React nodes only work in the React adapter. In Vue, Svelte and vanilla, pass a string or a DOM `Node`.
+React nodes only work in the React adapter. In Vue, Svelte, Solid, Angular and vanilla, pass a string or a DOM `Node`.
 
 </details>
 
@@ -448,7 +449,7 @@ npm run build   # tsup, outputs dist/
 npm run test:e2e -- chrome   # real-browser smoke test (needs playwright-core; also: firefox, webkit)
 ```
 
-The playground at `http://localhost:5173` exercises every feature: themes (with live color pickers for custom), positions, queue, the timer bar, rich cards, and copyable code for each example. The code shown there comes from the files that run, so it cannot drift.
+The playground at `http://localhost:5173` exercises every feature: themes (with live color pickers for custom), positions (including RTL), queue limits, dedupe, swipe direction, the timer bar, rich cards, callbacks, custom bodies, pause and resume, and copyable code for each example. The code shown there comes from the files that run, so it cannot drift.
 
 <details>
 <summary><b>How it works</b></summary>
