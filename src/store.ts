@@ -2,6 +2,10 @@ export type ToastType = "success" | "error" | "warning" | "info" | "loading" | "
 /** string | number | DOM Node | framework node (React element when used with the React adapter) */
 export type Content = string | number | boolean | Node | object | null;
 
+export type Presence = "online" | "away" | "busy" | "offline";
+/** one face: image URL, and/or a name (initials + gradient fallback when `src` is missing or fails to load) */
+export interface AvatarItem { src?: string; name?: string; presence?: Presence }
+
 export type Dedupe = "id" | "title";
 export type DismissReason = "timeout" | "swipe" | "button" | "escape" | "api";
 export interface ToastOptions {
@@ -9,6 +13,16 @@ export interface ToastOptions {
   id?: string;
   title: string;
   description?: Content;
+  /** URL, {src, name, presence}, or an array of either for an overlapping group. Replaces the built-in icon (ignored if `icon` is set, unless avatarPosition is "card"). */
+  avatar?: string | AvatarItem | (string | AvatarItem)[];
+  /** group size before collapsing into a "+N" chip. Default 3. */
+  avatarMax?: number;
+  /** "card": boarding-pass style card (variant "card"): header tab, big faces with name and presence, a perforated tear line, then the description and buttons. Default "leading". */
+  avatarPosition?: "leading" | "card";
+  /** tap / Enter on a face; `i` is its index, the "+N" chip reports `avatarMax`. Excluded from onClick and pin. */
+  onAvatarClick?: (i: number) => void;
+  /** animated typing dots after the title, e.g. "Ana is typing" */
+  typing?: boolean;
   /** replaces the built-in icon (leading slot) */
   icon?: Content;
   /** compact right-side slot, e.g. a countdown */

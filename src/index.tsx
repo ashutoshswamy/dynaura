@@ -5,7 +5,7 @@ import { createToaster } from "./core";
 import type { ToasterHandle, ToasterOptions } from "./core";
 
 export { dynaura } from "./store";
-export type { Content, DismissReason, ToastOptions, ToastType } from "./store";
+export type { AvatarItem, Content, DismissReason, Presence, ToastOptions, ToastType } from "./store";
 export type { CustomTheme, Position } from "./core";
 
 export type ToasterProps = Omit<ToasterOptions, "render">;

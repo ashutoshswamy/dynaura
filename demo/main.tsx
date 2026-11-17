@@ -5,7 +5,7 @@ import {
   ArrowUpRightIcon, ArrowsUpDownIcon, BanknotesIcon, BookOpenIcon, BugAntIcon, CalendarDaysIcon, CheckIcon, ChevronDownIcon,
   ClipboardDocumentCheckIcon, ClipboardDocumentIcon, ClockIcon, CodeBracketIcon, CursorArrowRaysIcon, FingerPrintIcon, GlobeAltIcon,
   MapPinIcon, MicrophoneIcon, MusicalNoteIcon, QueueListIcon, ServerStackIcon, ShoppingBagIcon, SparklesIcon, SwatchIcon,
-  TicketIcon, ViewfinderCircleIcon,
+  ComputerDesktopIcon, MoonIcon, SunIcon, TicketIcon, ViewfinderCircleIcon,
 } from "@heroicons/react/24/outline";
 import { Toaster, dynaura } from "../src/index";
 import type { CustomTheme, Position, ToasterProps } from "../src/index";
@@ -15,6 +15,17 @@ import fcCss from "./fc.css?raw";
 import "../src/styles.css";
 import "./fc.css";
 
+// offline avatars: diagonal two-stop gradients as SVG data URIs
+const av = (c1: string, c2: string) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="32" height="32" fill="url(#g)"/></svg>`);
+const AV = [av("#64d2ff", "#0a84ff"), av("#ff6482", "#bf5af2"), av("#ffd60a", "#ff453a"), av("#a8f0a0", "#0a9d58"), av("#ffb4e6", "#5e5ce6")];
+const PEOPLE = [
+  { name: "Ana Ruiz", presence: "online" as const },
+  { name: "Ben Okafor", presence: "away" as const },
+  { name: "Chiara Bellini", presence: "busy" as const },
+  { name: "Dev Patel" },
+  { name: "Elif Kaya", src: "/broken.png" }, // broken URL on purpose: falls back to initials
+  { name: "Finn Larsen" },
+];
 const wait = (ms: number, fail = false) => new Promise<void>((r, j) => setTimeout(fail ? j : r, ms));
 /** the exact source of a component in cards.tsx, so the code on the page is the code that runs */
 const part = (n: string) => cardsSrc.split(`// <${n}>\n`)[1].split(`// </${n}>`)[0].trim();
@@ -66,6 +77,8 @@ function Code({ code, dark }: { code: string | Record<string, string>; dark?: bo
   );
 }
 
+const TABS = ["Setup", "Rich cards", "Everyday", "Avatars", "Flows", "Live", "Behavior", "About"] as const;
+const TAB_ID: Record<(typeof TABS)[number], string> = { Setup: "setup", "Rich cards": "rich", Everyday: "everyday", Avatars: "avatars", Flows: "flows", Live: "live", Behavior: "behavior", About: "developer" };
 const SectionHead = ({ title, lead }: { title: string; lead: string }) => (
   <header className="sec-h"><h2>{title}</h2><p>{lead}</p></header>
 );
@@ -220,6 +233,46 @@ function App() {
   const [swipe, setSwipe] = useState<(typeof SWIPES)[number]>("edge");
   const [cap, setCap] = useState(false);
   const [byTitle, setByTitle] = useState(false);
+  const [sec, setSec] = useState<(typeof TABS)[number]>("Setup");
+  const lock = useRef(0);
+  const go = (t: (typeof TABS)[number]) => {
+    setSec(t);
+    lock.current = Date.now() + 900; // ignore scroll-spy while the smooth scroll runs
+    document.getElementById(TAB_ID[t])?.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.replaceState(null, "", "#" + TAB_ID[t]);
+  };
+  // scroll-spy: highlight the section under the sticky bar
+  useEffect(() => {
+    const io = new IntersectionObserver((es) => {
+      if (Date.now() < lock.current) return;
+      const v = es.filter((e) => e.isIntersecting).sort((x, y) => x.boundingClientRect.top - y.boundingClientRect.top)[0];
+      const t = v && TABS.find((k) => TAB_ID[k] === v.target.id);
+      if (t) setSec(t);
+    }, { rootMargin: "-30% 0px -60% 0px" });
+    TABS.forEach((t) => { const el = document.getElementById(TAB_ID[t]); if (el) io.observe(el); });
+    return () => io.disconnect();
+  }, []);
+  const [pref, setPref] = useState<"light" | "dark" | "system">(() => {
+    try { const v = localStorage.getItem("dynaura-demo-theme"); if (v === "light" || v === "dark") return v; } catch { /* storage blocked */ }
+    return "system";
+  });
+  const [themeOpen, setThemeOpen] = useState(false);
+  const themeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const mq = matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => { document.documentElement.dataset.theme = pref === "system" ? (mq.matches ? "dark" : "light") : pref; };
+    apply();
+    try { pref === "system" ? localStorage.removeItem("dynaura-demo-theme") : localStorage.setItem("dynaura-demo-theme", pref); } catch { /* storage blocked */ }
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [pref]);
+  useEffect(() => {
+    if (!themeOpen) return;
+    const out = (e: Event) => { if (!themeRef.current?.contains(e.target as Node)) setThemeOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { setThemeOpen(false); themeRef.current?.querySelector("button")?.focus(); } };
+    addEventListener("pointerdown", out); addEventListener("keydown", esc);
+    return () => { removeEventListener("pointerdown", out); removeEventListener("keydown", esc); };
+  }, [themeOpen]);
   const [log, setLog] = useState<string[]>([]);
   const [clicks, setClicks] = useState(0);
   const [frozen, setFrozen] = useState(false);
@@ -307,6 +360,20 @@ function App() {
         <div className="top">
           <a className="brand" href="#top" aria-label="dynaura home"><img src="/logo-mark.png" alt="" width={70} height={34} />dynaura</a>
           <nav className="nav" aria-label="Project links">
+            <div className="theme-menu" ref={themeRef}>
+              <button className="theme-btn" onClick={() => setThemeOpen((o) => !o)} aria-haspopup="menu" aria-expanded={themeOpen} aria-label={`Theme: ${pref}`} title="Theme">
+                {pref === "system" ? <ComputerDesktopIcon strokeWidth={1.8} /> : pref === "dark" ? <MoonIcon strokeWidth={1.8} /> : <SunIcon strokeWidth={1.8} />}
+              </button>
+              {themeOpen && (
+                <div className="theme-pop" role="menu" aria-label="Theme">
+                  {([["light", "Light", SunIcon], ["dark", "Dark", MoonIcon], ["system", "System", ComputerDesktopIcon]] as const).map(([v, label, I]) => (
+                    <button key={v} role="menuitemradio" aria-checked={pref === v} onClick={() => { setPref(v); setThemeOpen(false); }}>
+                      <I strokeWidth={1.8} aria-hidden="true" />{label}{pref === v && <CheckIcon className="tick" strokeWidth={2.4} aria-hidden="true" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <a href="https://dynaura.ashutoshswamy.in" target="_blank" rel="noreferrer"><BookOpenIcon strokeWidth={1.8} /><span>Docs</span></a>
             <a href="https://github.com/ashutoshswamy/dynaura" target="_blank" rel="noreferrer"><CodeBracketIcon strokeWidth={1.8} /><span>GitHub</span></a>
           </nav>
@@ -324,6 +391,7 @@ function App() {
       </div>
 
       <div className="bar">
+        <nav className="wrap menu" aria-label="Sections"><Seg label="Jump to section" value={sec} options={[...TABS]} onChange={go} /></nav>
         <div className="wrap bar-in">
           <label><span className="lab" title="Theme"><SwatchIcon strokeWidth={1.8} aria-hidden="true" /><span className="vh">Theme</span></span><Seg label="Theme" value={theme} options={[...THEMES]} onChange={setTheme} /></label>
           <label><span className="lab" title="Position"><ViewfinderCircleIcon strokeWidth={1.8} aria-hidden="true" /><span className="vh">Position</span></span><Seg label="Position" value={position} options={POSITIONS} onChange={setPosition} /></label>
@@ -354,7 +422,7 @@ function App() {
           <div className="setup"><Code code={SETUP} /></div>
         </section>
 
-        <section className="sec">
+        <section className="sec" id="rich">
           <SectionHead title="Rich cards" lead="Set variant to card and pass any component as the description. The header tab follows the position." />
           <div className="exs">
             <Example title="Boarding pass" blurb="Gate, seat, group and a barcode in one card."
@@ -408,7 +476,43 @@ function App() {
           </div>
         </section>
 
-        <section className="sec">
+        <section className="sec" id="avatars">
+          <SectionHead title="Avatars" lead="One face or a group, with names, presence, a boarding-pass style card and tappable faces." />
+          <div className="exs">
+            <Example title="Avatars" blurb="Images or names (gradient initials), presence, groups, a boarding-pass style card, tappable faces and typing dots."
+              code={`// image, or just a name: gradient + initials when src is missing or fails
+dynaura.info({
+  title: "Ana is typing",
+  typing: true,
+  avatar: { name: "Ana Ruiz", src: anaUrl, presence: "online" },
+});
+
+// group: 3 faces then "+N"; avatarMax changes the cap
+dynaura.info({
+  title: "5 new comments",
+  avatar: people, // (string | { src?, name?, presence? })[]
+  avatarMax: 4,
+  onAvatarClick: (i) => openProfile(people[i]),
+});
+
+// boarding-pass style card: big faces, name, presence, tear line, description
+dynaura.info({
+  title: "Meet your host",
+  description: "Design lead, joined 2021.",
+  avatar: { name: "Ana Ruiz", src: anaUrl, presence: "online" },
+  avatarPosition: "card",
+});`}
+              action={<>
+                <Btn f={() => dynaura.info({ title: "Ana is typing", typing: true, avatar: { name: "Ana Ruiz", presence: "online" }, duration: 5000 })}>Typing</Btn>
+                <Btn f={() => dynaura.info({ title: "5 new comments", description: "Tap a face to open a profile.", avatar: PEOPLE, avatarMax: 4, onAvatarClick: (i) => i < 4 ? dynaura.success(PEOPLE[i].name + "'s profile") : dynaura.info({ title: "Also in this thread", avatar: PEOPLE.slice(4), avatarMax: 4 }) })}>Group</Btn>
+                <Btn f={() => dynaura.info({ title: "Meet your host", description: "Design lead, joined 2021. Replies within the hour.", avatar: { name: "Ana Ruiz", src: AV[1], presence: "online" }, avatarPosition: "card", button: { title: "Say hello", onClick: () => dynaura.success("Message sent") }, duration: 8000 })}>Card</Btn>
+              </>}>
+              <div className="row"><b>Faces, names, presence</b><span className="sp">src optional</span></div>
+            </Example>
+          </div>
+        </section>
+
+        <section className="sec" id="everyday">
           <SectionHead title="Everyday toasts" lead="Success, errors, warnings and info, with actions, custom icons and trailing slots." />
           <div className="exs">
             <Example title="Checkout complete" blurb="Success with confetti and an action."
@@ -480,10 +584,27 @@ dynaura.success({
               action={<Btn f={copyLink}>Copy share link</Btn>}>
               <div className="row"><b style={{ fontFamily: "var(--mono)", fontSize: 13 }}>dynaura.dev/share/8f2a</b></div>
             </Example>
+
+            <Example title="Two actions" blurb="A secondary button next to the primary one."
+              code={`dynaura.success({
+  title: "File deleted",
+  button: { title: "Open trash", onClick: openTrash },
+  secondaryButton: { title: "Undo", onClick: restore },
+  duration: 6000,
+});`}
+              action={<Btn f={() => dynaura.success({ title: "File deleted", description: "report-final.pdf moved to trash.", button: { title: "Open trash", onClick: () => {} }, secondaryButton: { title: "Undo", onClick: () => {} }, duration: 6000 })}>Delete file</Btn>}>
+              <div className="row"><span className="dot">PDF</span><b>report-final.pdf</b><span className="sp">2.4 MB</span></div>
+            </Example>
+
+            <Example title="Custom body" blurb="Your own markup, no title row, no card."
+              code={`dynaura.custom(<Volume level={64} />, { duration: 3000 });`}
+              action={<Btn f={() => dynaura.custom(<div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", minWidth: 200 }}><b>Volume</b><div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(128,128,128,.35)" }}><div style={{ width: "64%", height: "100%", borderRadius: 3, background: "currentColor" }} /></div><span>64</span></div>, { duration: 3000 })}>Show volume</Btn>}>
+              <div className="row"><span className="dot"><ArrowsUpDownIcon strokeWidth={1.8} /></span><b>Anything fits</b><span className="sp">strings, nodes, components</span></div>
+            </Example>
           </div>
         </section>
 
-        <section className="sec">
+        <section className="sec" id="flows">
           <SectionHead title="Flows" lead="Promises, progress, undo and queues: toasts that change as work happens." />
           <div className="exs">
             <Example title="Deploy to production" blurb="Loading, then success or error, in the same island."
@@ -540,10 +661,16 @@ dynaura.update(id, {
               <div className="row"><span className="dot">DE</span><b>Dev</b><span className="sp">dev@studio.co</span></div>
               <div className="row"><span className="dot">SA</span><b>Sam</b><span className="sp">sam@studio.co</span></div>
             </Example>
+
+            <Example title="Update by id" blurb="Same id updates in place instead of stacking. Spam it."
+              code={`dynaura.info({ id: "save", title: \`Saved \${++n} times\` });`}
+              action={<Btn f={() => dynaura.info({ id: "save", title: `Saved ${++saves.current} times` })}>Save</Btn>}>
+              <div className="row"><b>One toast, one id</b><span className="sp">timer restarts on each save</span></div>
+            </Example>
           </div>
         </section>
 
-        <section className="sec">
+        <section className="sec" id="live">
           <SectionHead title="Live activities" lead="Sticky islands that keep running until you stop them." />
           <div className="exs">
             <Example title="Voice memo" blurb="A live timer that keeps counting."
@@ -568,32 +695,9 @@ dynaura.update(id, {
           </div>
         </section>
 
-        <section className="sec">
-          <SectionHead title="New in 0.2" lead="Callbacks, ids, custom bodies, a second button, pause, RTL. Swipe, queue cap and dedupe are in the bar above." />
+        <section className="sec" id="behavior">
+          <SectionHead title="Behavior" lead="Callbacks, ids, pause, per-toast style and RTL. Swipe, queue cap and dedupe are in the bar above." />
           <div className="exs">
-            <Example title="Two actions" blurb="A secondary button next to the primary one."
-              code={`dynaura.success({
-  title: "File deleted",
-  button: { title: "Open trash", onClick: openTrash },
-  secondaryButton: { title: "Undo", onClick: restore },
-  duration: 6000,
-});`}
-              action={<Btn f={() => dynaura.success({ title: "File deleted", description: "report-final.pdf moved to trash.", button: { title: "Open trash", onClick: () => {} }, secondaryButton: { title: "Undo", onClick: () => {} }, duration: 6000 })}>Delete file</Btn>}>
-              <div className="row"><span className="dot">PDF</span><b>report-final.pdf</b><span className="sp">2.4 MB</span></div>
-            </Example>
-
-            <Example title="Custom body" blurb="Your own markup, no title row, no card."
-              code={`dynaura.custom(<Volume level={64} />, { duration: 3000 });`}
-              action={<Btn f={() => dynaura.custom(<div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", minWidth: 200 }}><b>Volume</b><div style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(128,128,128,.35)" }}><div style={{ width: "64%", height: "100%", borderRadius: 3, background: "currentColor" }} /></div><span>64</span></div>, { duration: 3000 })}>Show volume</Btn>}>
-              <div className="row"><span className="dot"><ArrowsUpDownIcon strokeWidth={1.8} /></span><b>Anything fits</b><span className="sp">strings, nodes, components</span></div>
-            </Example>
-
-            <Example title="Update by id" blurb="Same id updates in place instead of stacking. Spam it."
-              code={`dynaura.info({ id: "save", title: \`Saved \${++n} times\` });`}
-              action={<Btn f={() => dynaura.info({ id: "save", title: `Saved ${++saves.current} times` })}>Save</Btn>}>
-              <div className="row"><b>One toast, one id</b><span className="sp">timer restarts on each save</span></div>
-            </Example>
-
             <Example title="Lifecycle" blurb="onShow, onDismiss(reason) and onAutoClose. Wait, swipe, press Escape or use Undo."
               code={`dynaura.info({
   title: "Watch the log",
@@ -636,10 +740,6 @@ dynaura.resume();  // and closes`}
               <div className="row"><b>Direction</b><span className="sp">{rtl ? "rtl" : "ltr"}</span></div>
             </Example>
           </div>
-        </section>
-
-        <section className="sec">
-          <SectionHead title="Gestures" lead="Hover, pin and swipe work the same on every toast." />
           <div className="gest">
             <div><h3><CursorArrowRaysIcon strokeWidth={1.8} />Hover</h3><p>Expands the island and pauses the timer. Leave and it resumes with the exact time left.</p></div>
             <div><h3><FingerPrintIcon strokeWidth={1.8} />Tap or long-press</h3><p>Pins an expandable toast open. Tap anywhere else to let go.</p></div>

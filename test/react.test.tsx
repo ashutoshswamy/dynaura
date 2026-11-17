@@ -25,3 +25,15 @@ test("React nodes render into the island via portals", async () => {
 test("SSR renders nothing and does not touch the DOM", () => {
   expect(renderToString(<Toaster />)).toBe("");
 });
+
+test("React: avatar options and a React-node description flow through the adapter", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => { root.render(<Toaster />); });
+  await act(async () => { dynaura.info({ title: "Ana", avatar: [{ name: "Ana Ruiz" }, { name: "Ben Okafor" }], avatarPosition: "card", description: <b data-d>hi</b> }); });
+  expect(document.querySelectorAll(".dynaura-pass .dynaura-face").length).toBe(2);
+  expect(document.querySelector(".dynaura-who b")?.textContent).toBe("Ana Ruiz & Ben Okafor");
+  expect(document.querySelector(".dynaura-desc b[data-d]")?.textContent).toBe("hi");
+  await act(async () => { root.unmount(); });
+});

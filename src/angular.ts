@@ -4,7 +4,7 @@ import type { ToasterHandle, ToasterOptions } from "./core";
 
 export { dynaura } from "./store";
 export type { CustomTheme, Position, ToasterOptions } from "./core";
-export type { Content, DismissReason, ToastOptions, ToastType } from "./store";
+export type { AvatarItem, Content, DismissReason, Presence, ToastOptions, ToastType } from "./store";
 
 /**
  * Call once in an injection context (root component constructor / field initializer).

@@ -1,6 +1,6 @@
 import { burst } from "./confetti";
 import { dynaura, getCurrent, isPaused, setQueue, setQueueOpts, subscribe } from "./store";
-import type { Content, Dedupe, Toast, ToastType } from "./store";
+import type { AvatarItem, Content, Dedupe, Toast, ToastType } from "./store";
 
 declare const process: { env: { NODE_ENV?: string } }; // replaced by bundlers; guarded by try/catch below
 
@@ -79,6 +79,13 @@ function outline(w: number, h: number, cw: number, ch: number, hx: number) {
   return d + `A${r} ${r} 0 0 1 ${f2(x0 + r)} 0Z`;
 }
 
+/** move an outline() path right by dx (M / H / A carry absolute x). */
+const shift = (d: string, dx: number) => (dx ? d.replace(/([MHA])([^MHAVZ]*)/g, (_, c: string, a: string) => {
+  const n = a.trim().split(/[\s,]+/).map(Number);
+  if (c === "H") n[0] += dx; else if (c === "M") n[0] += dx; else n[5] += dx;
+  return c + n.map(f2).join(" ");
+}) : d);
+
 const h = (tag: string, cls: string, parent?: Element) => {
   const e = document.createElement(tag);
   e.className = cls;
@@ -106,6 +113,17 @@ function roll(e: HTMLElement, s: string) {
   [...s].forEach((ch, i) => { if (/\d/.test(ch)) (e.children[i] as HTMLElement).style.setProperty("--d", ch); });
 }
 
+const ini = (n = "") => n.trim().split(/\s+/).slice(0, 2).map((w) => [...w][0] ?? "").join("").toUpperCase();
+// name -> stable two-stop gradient (same name, same colors)
+const grad = (n: string) => {
+  let x = 0;
+  for (const c of n) x = (x * 31 + c.charCodeAt(0)) % 360;
+  return `linear-gradient(135deg, hsl(${x} 62% 46%), hsl(${(x + 48) % 360} 62% 34%))`;
+};
+const avC = (n: Toast) => !!n.avatar && n.avatarPosition === "card"; // boarding-pass style card
+const avL = (n: Toast) => !!n.avatar && !avC(n) && n.icon == null;
+const faceItems = (n: Toast) => ([n.avatar!].flat() as (string | AvatarItem)[]).map((x): AvatarItem => (typeof x === "string" ? { src: x } : x));
+
 export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
   const o = { position: "top", offset: 12, theme: "dark", timer: true, haptics: true, queue: false, maxQueue: Infinity, dedupe: "id", swipe: "edge" } as Required<Omit<ToasterOptions, "render">> & Pick<ToasterOptions, "render">;
   const merge = (n: ToasterOptions) => { for (const k in n) if ((n as any)[k] !== undefined) (o as any)[k] = (n as any)[k]; };
@@ -125,8 +143,14 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
   const row = h("div", "dynaura-row", inner);
   const badge = h("span", "dynaura-badge", row);
   const title = h("span", "dynaura-title", row);
+  const typing = h("span", "dynaura-typing", row);
+  typing.setAttribute("aria-hidden", "true");
+  typing.innerHTML = "<i></i><i></i><i></i>";
+  typing.hidden = true;
   const trail = h("span", "dynaura-trailing", row);
   const body = h("div", "dynaura-body", inner);
+  const pass = h("div", "dynaura-pass", body);
+  pass.hidden = true;
   const desc = h("div", "dynaura-desc", body);
   const actions = h("div", "dynaura-actions", body);
   const btn = h("button", "dynaura-button", actions) as HTMLButtonElement;
@@ -157,7 +181,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     root.dataset.y = y; root.dataset.x = px;
   };
   const dir = () => (o.position.startsWith("bottom") ? 1 : -1); // sign of "toward the screen edge" in y
-  const hasBody = () => !!t && t.custom == null && ((t.description != null && typeof t.description !== "boolean") || !!t.button || !!t.secondaryButton);
+  const hasBody = () => !!t && t.custom == null && (avC(t) || (t.description != null && typeof t.description !== "boolean") || !!t.button || !!t.secondaryButton);
   const paused = () => hovered || pinned || dragging || isPaused();
 
   // fill a slot; framework nodes go into a fresh host so later unmounts never touch live DOM
@@ -169,6 +193,49 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     if (typeof c === "string" || typeof c === "number") slot.textContent = String(c);
     else if (c instanceof Node) slot.append(c);
     else if (o.render) { const host = h("span", "dynaura-host", slot) as HTMLElement; hosts.set(slot, host); o.render(host, c); }
+  }
+
+  // avatar faces into `slot`: image, or a gradient + initials disc when there is no src / it fails to load
+  function paint(slot: HTMLElement, n: Toast) {
+    const max = Math.max(1, n.avatarMax ?? 3);
+    const items = faceItems(n);
+    const more = items.length - max;
+    const faces = items.slice(0, max).map((it, i) => {
+      const f = h("span", "dynaura-face");
+      if (it.src) {
+        const im = h("img", "", f) as HTMLImageElement;
+        im.alt = ""; im.decoding = "async";
+        im.onerror = () => { im.remove(); f.style.background = grad(it.name ?? ""); f.prepend(ini(it.name)); };
+        im.src = it.src;
+      } else { f.style.background = grad(it.name ?? ""); f.prepend(ini(it.name)); }
+      if (it.presence) { f.dataset.presence = it.presence; h("i", "dynaura-presence", f); }
+      if (it.name) f.title = it.name;
+      return f;
+    });
+    if (more > 0) { const f = h("span", "dynaura-face dynaura-more"); f.textContent = more > 99 ? "99+" : "+" + more; faces.push(f); }
+    faces.forEach((f, i) => {
+      f.style.setProperty("--i", String(i));
+      if (!n.onAvatarClick) return;
+      f.dataset.click = "";
+      f.tabIndex = 0; f.setAttribute("role", "button");
+      f.setAttribute("aria-label", f.title || (f.classList.contains("dynaura-more") ? f.textContent! + " more" : "Avatar " + (i + 1)));
+      f.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); t?.onAvatarClick?.(i); } };
+      f.dataset.i = String(i);
+    });
+    slot.replaceChildren(...faces);
+  }
+
+  // card layout (avatarPosition "card"): faces + who they are, then a perforated tear line before the description
+  function fillPass(n: Toast) {
+    pass.hidden = !avC(n);
+    pass.replaceChildren();
+    if (!avC(n)) return;
+    const items = faceItems(n), names = items.map((i) => i.name).filter(Boolean) as string[];
+    paint(h("div", "dynaura-avatar", pass), n);
+    const who = h("div", "dynaura-who", pass);
+    if (names.length) h("b", "", who).textContent = names.length > 2 ? `${names[0]}, ${names[1]} +${names.length - 2}` : names.join(" & ");
+    const sub = items.length > 1 ? items.length + " people" : items[0].presence;
+    if (sub) h("span", "", who).textContent = sub[0].toUpperCase() + sub.slice(1);
   }
 
   // ---- size morph ----
@@ -185,7 +252,11 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     // header tab follows the position: centered island, or flush to the left / right edge
     const hx = px === "left" ? 0 : px === "right" ? Math.max(0, w - sz.cw) : Math.max(0, (w - sz.cw) / 2);
     row.style.transform = `translateX(${f2(hx)}px)`;
-    island.style.clipPath = `path('${card ? outline(w, hh, sz.cw, sz.ch, hx) : outline(w, hh, w, hh, 0)}')`;
+    // the drawn body is only as wide as it is tall: a thin strip under the header would otherwise show as a sharp-cornered shelf wider than the pill
+    const k = card ? Math.min(1, Math.max(0, (hh - sz.ch) / 64)) : 1;
+    const we = card ? Math.min(w, sz.cw + Math.max(0, w - sz.cw) * k * k * (3 - 2 * k)) : w; // never wider than the box: the spring undershoots below the pill width and the box would clip the corners square
+    const dx = px === "left" ? 0 : px === "right" ? w - we : (w - we) / 2;
+    island.style.clipPath = `path('${card ? shift(outline(we, hh, sz.cw, sz.ch, hx - dx), dx) : outline(w, hh, w, hh, 0)}')`;
   }
   function shapeLoop() {
     cancelAnimationFrame(raf);
@@ -268,14 +339,18 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     custom.sty = Object.keys(n.style ?? {}).map((k) => (k.startsWith("--") ? k : k.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase())));
     island.classList.add(...custom.cls);
     Object.values(n.style ?? {}).forEach((v, i) => island.style.setProperty(custom.sty[i], String(v)));
-    island.dataset.variant = drag.dataset.variant = n.variant ?? "default";
-    if (ch("type") || ch("icon") || ch("kind")) {
+    island.dataset.variant = drag.dataset.variant = n.variant ?? (avC(n) ? "card" : "default");
+    if (ch("type") || ch("icon") || ch("kind") || ch("avatar") || ch("avatarPosition") || ch("avatarMax") || ch("onAvatarClick")) {
+      fillPass(n);
       put(badge, undefined);
-      if (n.icon != null) put(badge, n.icon);
+      badge.classList.toggle("dynaura-avatar", avL(n));
+      if (avL(n)) paint(badge, n);
+      else if (n.icon != null) put(badge, n.icon);
       else badge.innerHTML = n.type === "live" ? ((n.kind ?? "timer") === "wave" ? WAVE : DOT) : ICON[n.type];
       restart(badge);
     }
     if (ch("title")) { title.textContent = n.title; restart(title); }
+    typing.hidden = !n.typing;
     if (ch("trailing") || ch("progress") || ch("type") || ch("kind")) {
       trail.hidden = !hasTrail(n);
       if (n.trailing != null) { delete trail.dataset.sig; trail.removeAttribute("aria-label"); put(trail, n.trailing); }
@@ -287,7 +362,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     if (n.button) btn.textContent = n.button.title;
     btn2.hidden = !n.secondaryButton;
     if (n.secondaryButton) btn2.textContent = n.secondaryButton.title;
-    body.hidden = cu || (!(n.description != null && typeof n.description !== "boolean") && !n.button && !n.secondaryButton);
+    body.hidden = cu || (!avC(n) && !(n.description != null && typeof n.description !== "boolean") && !n.button && !n.secondaryButton);
     // bar: value progress, else time remaining
     bar.dataset.mode = n.progress != null ? "value" : n.duration != null ? "time" : "none";
     bar.style.setProperty("--p", String(n.progress ?? 0));
@@ -373,7 +448,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
 
   // ---- pointer: hover (mouse), tap-to-pin, long-press, swipe to dismiss ----
   // ponytail: swipe is vertical only (toward the anchored screen edge); add horizontal for corner positions if wanted.
-  let sy = 0, t0 = 0, moved = false, longed = false;
+  let sy = 0, t0 = 0, moved = false, longed = false, downFace: HTMLElement | null = null;
   const sign = () => (o.swipe === "up" ? -1 : o.swipe === "down" ? 1 : dir()); // y direction that dismisses
   const dist = (dy: number) => (o.swipe === "both" ? Math.abs(dy) : dy * sign()); // distance in the dismiss direction
   island.addEventListener("pointerenter", (e) => { if ((e as PointerEvent).pointerType === "mouse") { hovered = true; sync(); } });
@@ -386,6 +461,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
   drag.addEventListener("pointerdown", (e) => {
     if (!t || (e.target as Element).closest("button")) return;
     dragging = true; moved = longed = false; sy = e.clientY; t0 = Date.now();
+    downFace = t.onAvatarClick ? (e.target as Element).closest<HTMLElement>(".dynaura-face") : null;
     drag.setPointerCapture?.(e.pointerId);
     drag.style.transition = "none";
     lp = setTimeout(() => { if (!moved) { longed = true; pinned = true; if (o.haptics) navigator.vibrate?.(8); sync(); } }, 450);
@@ -408,6 +484,7 @@ export function createToaster(initial: ToasterOptions = {}): ToasterHandle {
     const v = d / Math.max(1, Date.now() - t0);
     if (e.type === "pointerup" && moved && (d > 40 || (v > 0.5 && d > 10)) && t && o.swipe !== "none") { dynaura.dismiss(t.id, "swipe"); return; }
     drag.style.transform = "";
+    if (e.type === "pointerup" && !moved && !longed && downFace?.dataset.i != null) { t?.onAvatarClick?.(+downFace.dataset.i); sync(); return; }
     if (e.type === "pointerup" && !moved && !longed) t?.onClick?.();
     if (e.type === "pointerup" && !moved && !longed && hasBody()) {
       pinned = !pinned;

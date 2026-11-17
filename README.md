@@ -34,6 +34,7 @@ That is the whole setup: mount one `<Toaster />`, call `dynaura` from anywhere.
 | **Rich cards**                | `variant: "card"` turns the toast into a header tab plus any custom body, joined by a curved notch. Flight passes, ride trackers, receipts. |
 | **Actions and callbacks**     | Primary and secondary buttons (undo), `onShow` / `onDismiss(reason)` / `onAutoClose`, `onClick`, custom ids that update instead of stacking.    |
 | **Live activities**           | Sticky toasts with a running timer or an animated waveform.                                                                                 |
+| **Avatars**           | Faces, groups with a "+N" chip, presence dots, a name-and-gradient fallback and a boarding-pass style card.                                                                                 |
 | **Progress that feels alive** | A value bar and rolling digits, updated in place with `dynaura.update`.                                                                     |
 | **Built for touch**           | Swipe to dismiss, tap or long-press to pin, hover to pause.                                                                                 |
 | **Themeable**                 | Dark, light, system, or your own colors. Everything is a CSS variable.                                                                      |
@@ -263,6 +264,39 @@ dynaura.info({
 });
 ```
 
+### Avatars
+
+```tsx
+// one face
+dynaura.info({ title: "Ana sent a message", avatar: "https://example.com/ana.jpg" });
+
+// name only: a gradient disc with initials. Also the fallback when an image fails to load.
+dynaura.info({
+  title: "Ana is typing",
+  typing: true, // animated dots after the title
+  avatar: { name: "Ana Ruiz", presence: "online" },
+});
+
+// group: overlapping faces, then a "+N" chip
+dynaura.info({
+  title: "5 new comments",
+  avatar: [{ name: "Ana Ruiz" }, { name: "Ben Okafor", src: benUrl }, "c.jpg", "d.jpg", "e.jpg"],
+  avatarMax: 3, // default 3
+  onAvatarClick: (i) => openProfile(i), // the "+N" chip reports avatarMax
+});
+
+// boarding-pass style card: header tab, big faces, name and presence, a tear line, then the description
+dynaura.info({
+  title: "Meet your host",
+  description: "Design lead, joined 2021.",
+  avatar: { name: "Ana Ruiz", src: anaUrl, presence: "online" },
+  avatarPosition: "card",
+  button: { title: "Say hello", onClick: sayHello },
+});
+```
+
+`avatar` is a URL, an `{ src?, name?, presence? }` object, or an array of either. `icon` wins over a leading avatar. Tapping a face (or pressing Enter / Space on it) calls `onAvatarClick` and does not trigger `onClick` or pin the toast.
+
 ## API
 
 ### `dynaura`
@@ -287,6 +321,11 @@ dynaura.info({
 | `description` | `string \| Node \| ReactNode` |                   | Shown when the island expands.                                          |
 | `icon`        | same                          | built-in          | Replaces the leading icon.                                              |
 | `trailing`    | same                          |                   | Small right-side slot, e.g. `"2 min"`.                                  |
+| `avatar`      | `string \| AvatarItem \| (string \| AvatarItem)[]` | | Round face(s) in place of the icon. `AvatarItem` is `{ src?, name?, presence? }`; `presence` is `"online" \| "away" \| "busy" \| "offline"`. No `src`, or a failed load, shows a gradient disc with initials. |
+| `avatarMax`   | `number`                      | `3`               | Faces shown before the rest collapse into a `+N` chip.                  |
+| `avatarPosition` | `"leading" \| "card"`      | `"leading"`       | `"card"`: boarding-pass style card (implies `variant: "card"`) with big faces, name, presence and a tear line. |
+| `onAvatarClick` | `(i: number) => void`       |                   | Tap or Enter on a face. `i` is its index; the `+N` chip reports `avatarMax`. |
+| `typing`      | `boolean`                     | `false`           | Animated typing dots after the title.                                   |
 | `duration`    | `number \| null`              | `4000`            | Milliseconds. `null` is sticky. `loading` and `live` default to `null`. |
 | `button`      | `{ title, onClick }`          |                   | Action button. The toast dismisses after the click.                     |
 | `progress`    | `number` (0 to 1)             |                   | Value bar plus rolling-digit percent.                                   |

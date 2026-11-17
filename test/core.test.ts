@@ -192,3 +192,27 @@ test("logical positions follow direction; second Toaster warns", () => {
   expect(w).toHaveBeenCalledOnce();
   w.mockRestore();
 });
+
+test("avatars: group cap, initials fallback, presence, card layout, click, typing", () => {
+  const onAvatarClick = vi.fn();
+  dynaura.info({
+    title: "Ana is typing", typing: true, avatarMax: 2, onAvatarClick,
+    avatar: [{ name: "Ana Ruiz", presence: "online" }, "b.jpg", "c.jpg", "d.jpg"],
+  });
+  const faces = [...document.querySelectorAll<HTMLElement>(".dynaura-badge .dynaura-face")];
+  expect(faces.map((f) => f.textContent)).toEqual(["AR", "", "+2"]); // 2 faces + "+2" chip
+  expect(faces[0].dataset.presence).toBe("online");
+  expect(faces[0].querySelector("img")).toBeNull(); // no src: initials disc
+  expect($(".dynaura-typing").hidden).toBe(false);
+  faces[1].querySelector("img")!.dispatchEvent(new Event("error")); // broken URL -> disc, no initials without a name
+  expect(faces[1].querySelector("img")).toBeNull();
+  faces[0].dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  expect(onAvatarClick).toHaveBeenCalledWith(0);
+
+  dynaura.info({ id: "t", title: "Meet Ana", avatar: { name: "Ana Ruiz", presence: "online" }, avatarPosition: "card", description: "Design lead" });
+  expect(island().dataset.variant).toBe("card"); // card layout implies the card variant
+  expect($(".dynaura-badge").classList.contains("dynaura-avatar")).toBe(false); // type icon stays leading
+  expect($(".dynaura-who b").textContent).toBe("Ana Ruiz");
+  expect($(".dynaura-who span").textContent).toBe("Online");
+  expect(document.querySelectorAll(".dynaura-pass .dynaura-face").length).toBe(1);
+});
